@@ -31,17 +31,17 @@ const Dashboard = () => {
       {/* Stats */}
       <section className="px-5 mt-6 grid grid-cols-3 gap-3">
         {[
-          { icon: Sparkles, label: "Matches", value: "12", tint: "bg-primary/10 text-primary" },
-          { icon: Flame, label: "Streak", value: "47d", tint: "bg-accent/20 text-accent" },
-          { icon: Calendar, label: "Events", value: "3", tint: "bg-secondary text-foreground" },
+          { icon: Sparkles, label: "Matches", value: "12", tint: "bg-primary/10 text-primary", to: "/app/matches" },
+          { icon: Flame, label: "Streak", value: "47d", tint: "bg-accent/20 text-accent", to: "/app" },
+          { icon: Calendar, label: "Events", value: "3", tint: "bg-secondary text-foreground", to: "/app/events" },
         ].map((s) => (
-          <div key={s.label} className="glass-card rounded-2xl p-4 text-center">
+          <Link to={s.to} key={s.label} className="glass-card rounded-2xl p-4 text-center hover:shadow-warm transition-all">
             <div className={`h-9 w-9 rounded-xl mx-auto grid place-items-center ${s.tint}`}>
               <s.icon className="h-4 w-4" />
             </div>
             <p className="font-serif text-2xl mt-2">{s.value}</p>
             <p className="text-[11px] text-muted-foreground uppercase tracking-wider">{s.label}</p>
-          </div>
+          </Link>
         ))}
       </section>
 

@@ -114,4 +114,6 @@
   .bg-gradient-dusk { background: var(--gradient-dusk); }
   .shadow-warm { box-shadow: var(--shadow-warm); }
   .shadow-soft { box-shadow: var(--shadow-soft); }
+  .scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
 }
