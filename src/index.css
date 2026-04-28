@@ -1,105 +1,117 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
+/* AatmamIlan – Spiritual Matrimony Design System
+   Earthy: saffron, gold, beige, sandalwood. All HSL.
 */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 40 38% 96%;
+    --foreground: 25 30% 18%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 40 45% 98%;
+    --card-foreground: 25 30% 18%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 40 45% 98%;
+    --popover-foreground: 25 30% 18%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 24 75% 48%;            /* saffron */
+    --primary-foreground: 40 45% 98%;
+    --primary-glow: 30 90% 62%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 35 45% 88%;          /* warm beige */
+    --secondary-foreground: 25 35% 22%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 38 30% 92%;
+    --muted-foreground: 25 15% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 42 70% 55%;             /* gold */
+    --accent-foreground: 25 35% 18%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --gold: 42 78% 52%;
+    --sandalwood: 30 35% 70%;
+    --clay: 18 45% 38%;
+    --ivory: 40 50% 96%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 40 45% 98%;
 
-    --radius: 0.5rem;
+    --border: 35 25% 82%;
+    --input: 35 25% 86%;
+    --ring: 24 75% 48%;
 
-    --sidebar-background: 0 0% 98%;
+    --radius: 1rem;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    --gradient-saffron: linear-gradient(135deg, hsl(24 75% 48%), hsl(30 90% 62%));
+    --gradient-gold: linear-gradient(135deg, hsl(42 78% 52%), hsl(35 70% 65%));
+    --gradient-dawn: linear-gradient(180deg, hsl(40 60% 96%), hsl(30 55% 88%));
+    --gradient-dusk: linear-gradient(180deg, hsl(28 45% 25%) 0%, hsl(18 55% 35%) 60%, hsl(30 80% 55%) 100%);
 
-    --sidebar-primary: 240 5.9% 10%;
+    --shadow-soft: 0 4px 20px -4px hsl(25 35% 25% / 0.08);
+    --shadow-warm: 0 12px 40px -10px hsl(24 75% 48% / 0.25);
+    --shadow-card: 0 2px 12px -2px hsl(25 30% 20% / 0.06), 0 8px 32px -8px hsl(25 30% 20% / 0.08);
 
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --transition-soft: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --background: 25 25% 10%;
+    --foreground: 40 30% 92%;
+    --card: 25 22% 13%;
+    --card-foreground: 40 30% 92%;
+    --popover: 25 22% 13%;
+    --popover-foreground: 40 30% 92%;
+    --primary: 30 85% 58%;
+    --primary-foreground: 25 25% 10%;
+    --secondary: 25 18% 18%;
+    --secondary-foreground: 40 30% 92%;
+    --muted: 25 15% 16%;
+    --muted-foreground: 35 15% 65%;
+    --accent: 42 70% 55%;
+    --accent-foreground: 25 25% 10%;
+    --border: 25 15% 22%;
+    --input: 25 15% 22%;
+    --ring: 30 85% 58%;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-
+  * { @apply border-border; }
+  html { -webkit-tap-highlight-color: transparent; }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: 'ss01', 'cv11';
   }
+  h1, h2, h3, h4, .font-serif {
+    font-family: 'Cormorant Garamond', serif;
+    letter-spacing: -0.01em;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-xl border border-border/60;
+    box-shadow: var(--shadow-card);
+  }
+  .om-divider::before {
+    content: 'ॐ';
+    @apply text-primary/60 font-serif;
+  }
+  .text-gradient-saffron {
+    background: var(--gradient-saffron);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .bg-gradient-saffron { background: var(--gradient-saffron); }
+  .bg-gradient-gold { background: var(--gradient-gold); }
+  .bg-gradient-dawn { background: var(--gradient-dawn); }
+  .bg-gradient-dusk { background: var(--gradient-dusk); }
+  .shadow-warm { box-shadow: var(--shadow-warm); }
+  .shadow-soft { box-shadow: var(--shadow-soft); }
 }
