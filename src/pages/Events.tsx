@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { PageHeader } from "@/components/PageHeader";
 import retreat from "@/assets/event-retreat.jpg";
 import satsang from "@/assets/event-satsang.jpg";
@@ -5,10 +6,19 @@ import { MapPin, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
 import { getAllProfilesExceptMe, getDisplayName, getProfileCity, type UserProfileWithCompatibility } from "@/lib/db";
+=======
+import { events } from "@/data/dummy";
+import { PageHeader } from "@/components/PageHeader";
+import retreat from "@/assets/event-retreat.jpg";
+import satsang from "@/assets/event-satsang.jpg";
+import { Calendar, MapPin, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+>>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
 
 const imgMap: Record<string, string> = { retreat, satsang };
 
 const Events = () => {
+<<<<<<< HEAD
   const [profiles, setProfiles] = useState<UserProfileWithCompatibility[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,6 +46,8 @@ const Events = () => {
     [profiles]
   );
 
+=======
+>>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
   return (
     <div className="animate-fade-in">
       <PageHeader title="Gatherings" subtitle="Satsangs · retreats · pilgrimages" />
@@ -50,8 +62,11 @@ const Events = () => {
         </div>
 
         <div className="space-y-5">
+<<<<<<< HEAD
           {loading && <p className="text-sm text-muted-foreground">Loading events...</p>}
           {!loading && events.length === 0 && <p className="text-sm text-muted-foreground">No events available yet.</p>}
+=======
+>>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
           {events.map((e, i) => (
             <article key={e.id} className="rounded-2xl overflow-hidden bg-card shadow-card animate-fade-in" style={{ animationDelay: `${i * 0.05}s` }}>
               <div className="relative aspect-[16/10]">
