@@ -206,7 +206,11 @@ const Profile = () => {
         toast.error("This profile is unavailable.");
         return;
       }
-      toast.error("Unable to send request right now.");
+      if (likeResult.reason === "unauthorized") {
+        toast.error(likeResult.error ?? "Please sign in again.");
+        return;
+      }
+      toast.error(likeResult.error ?? "Unable to send request right now.");
       return;
     }
 

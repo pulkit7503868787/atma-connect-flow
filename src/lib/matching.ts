@@ -95,7 +95,7 @@ export const getMatchesForUser = async (currentUser: MatchingUser): Promise<Rank
 export const getConfirmedMatchesForUser = async (currentUser: MatchingUser): Promise<RankedMatch[]> => {
   const { data: matchRows, error: matchError } = await supabase
     .from("matches")
-    .select("user1_id,user2_id,compatibility_score")
+    .select("user1_id,user2_id,compatibility_score,status")
     .or(`user1_id.eq.${currentUser.id},user2_id.eq.${currentUser.id}`)
     .order("compatibility_score", { ascending: false });
 
@@ -103,7 +103,13 @@ export const getConfirmedMatchesForUser = async (currentUser: MatchingUser): Pro
     return [];
   }
 
-  const otherUserIds = matchRows.map((row) =>
+  const confirmedRows = matchRows.filter((row) => row.status === "matched" || row.status == null);
+
+  if (!confirmedRows.length) {
+    return [];
+  }
+
+  const otherUserIds = confirmedRows.map((row) =>
     row.user1_id === currentUser.id ? row.user2_id : row.user1_id
   );
 
@@ -118,7 +124,7 @@ export const getConfirmedMatchesForUser = async (currentUser: MatchingUser): Pro
 
   const usersById = new Map(usersData.map((row) => [row.id, normalizeUser(row)]));
 
-  return matchRows
+  return confirmedRows
     .map((row) => {
       const otherUserId = row.user1_id === currentUser.id ? row.user2_id : row.user1_id;
       const user = usersById.get(otherUserId);

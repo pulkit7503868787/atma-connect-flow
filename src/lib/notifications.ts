@@ -23,14 +23,14 @@ export const createNotification = async (
   userId: string,
   type: NotificationType,
   referenceId: string | null
-) => {
+): Promise<{ ok: boolean; error: string | null }> => {
   const { error } = await supabase.from("notifications").insert({
     user_id: userId,
     type,
     reference_id: referenceId,
   });
 
-  return !error;
+  return { ok: !error, error: error?.message ?? null };
 };
 
 export const getNotifications = async (userId: string): Promise<AppNotification[]> => {
