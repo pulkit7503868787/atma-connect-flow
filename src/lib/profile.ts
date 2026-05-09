@@ -2,12 +2,15 @@ import { supabase } from "@/lib/supabaseClient";
 
 export type ProfileUpdateInput = Partial<{
   full_name: string | null;
+  gender: string | null;
+  seeking_gender: string | null;
   age: number | null;
   city: string | null;
   bio: string | null;
   guru: string | null;
   practices: string[];
   avatar_url: string | null;
+  onboarding_completed: boolean;
 }>;
 
 /** Updates only columns present in `data`. Caller must be authenticated as `userId`. */

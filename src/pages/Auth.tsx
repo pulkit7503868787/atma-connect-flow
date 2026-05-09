@@ -7,6 +7,7 @@ import { ArrowLeft, Mail, Phone } from "lucide-react";
 import { toast } from "sonner";
 import { getCurrentSession, signInWithEmail, signInWithGoogle, signUpWithEmail, upsertPublicUser } from "@/lib/auth";
 import { supabase } from "@/lib/supabaseClient";
+import { getCurrentUserProfile, isProfileComplete } from "@/lib/db";
 
 const Auth = () => {
   const nav = useNavigate();
@@ -28,7 +29,8 @@ const Auth = () => {
 
       if (session) {
         await upsertPublicUser(session.user);
-        nav("/app", { replace: true });
+        const profile = await getCurrentUserProfile();
+        nav(isProfileComplete(profile) ? "/app" : "/onboarding", { replace: true });
       }
     };
 
@@ -40,7 +42,8 @@ const Auth = () => {
       }
 
       await upsertPublicUser(session.user);
-      nav("/app", { replace: true });
+      const profile = await getCurrentUserProfile();
+      nav(isProfileComplete(profile) ? "/app" : "/onboarding", { replace: true });
     });
 
     return () => {
@@ -88,7 +91,8 @@ const Auth = () => {
     }
 
     if (mode === "signin") {
-      nav("/app", { replace: true });
+      const profile = await getCurrentUserProfile();
+      nav(isProfileComplete(profile) ? "/app" : "/onboarding", { replace: true });
       return;
     }
 

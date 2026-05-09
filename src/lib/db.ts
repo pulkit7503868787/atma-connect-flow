@@ -11,12 +11,15 @@ export type UserProfile = {
   id: string;
   email: string;
   full_name: string | null;
+  gender: string | null;
+  seeking_gender: string | null;
   age: number | null;
   city: string | null;
   guru: string | null;
   practices: string[];
   bio: string | null;
   avatar_url: string | null;
+  onboarding_completed: boolean;
   is_blocked: boolean;
   chat_disabled: boolean;
   created_at: string;
@@ -66,16 +69,38 @@ const toUserProfile = (row: Partial<UserProfile>): UserProfile => ({
   id: row.id ?? "",
   email: row.email ?? "",
   full_name: row.full_name ?? null,
+  gender: row.gender ?? null,
+  seeking_gender: row.seeking_gender ?? null,
   age: parseAge(row.age),
   city: row.city ?? null,
   guru: row.guru ?? null,
   practices: Array.isArray(row.practices) ? row.practices : [],
   bio: row.bio ?? null,
   avatar_url: row.avatar_url ?? null,
+  onboarding_completed: row.onboarding_completed === true,
   is_blocked: row.is_blocked === true,
   chat_disabled: row.chat_disabled === true,
   created_at: row.created_at ?? new Date().toISOString(),
 });
+
+const hasText = (value: string | null | undefined) => Boolean(value && value.trim().length > 0);
+
+export const isProfileComplete = (profile: UserProfile | null) => {
+  if (!profile) {
+    return false;
+  }
+
+  return (
+    hasText(profile.gender) &&
+    hasText(profile.seeking_gender) &&
+    profile.age != null &&
+    hasText(profile.city) &&
+    hasText(profile.bio) &&
+    hasText(profile.guru) &&
+    profile.practices.length > 0 &&
+    profile.onboarding_completed
+  );
+};
 
 const indexFromId = (id: string) =>
   id.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
@@ -148,7 +173,7 @@ export const getCurrentUserProfile = async (): Promise<UserProfile | null> => {
 
   const { data, error } = await supabase
     .from("users")
-    .select("id,email,full_name,age,city,guru,practices,bio,avatar_url,is_blocked,chat_disabled,created_at")
+    .select("id,email,full_name,gender,seeking_gender,age,city,guru,practices,bio,avatar_url,onboarding_completed,is_blocked,chat_disabled,created_at")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -167,7 +192,7 @@ export const getAllProfilesExceptMe = async (): Promise<UserProfileWithCompatibi
 
   const { data, error } = await supabase
     .from("users")
-    .select("id,email,full_name,age,city,guru,practices,bio,avatar_url,is_blocked,chat_disabled,created_at")
+    .select("id,email,full_name,gender,seeking_gender,age,city,guru,practices,bio,avatar_url,onboarding_completed,is_blocked,chat_disabled,created_at")
     .neq("id", me.id)
     .eq("is_blocked", false)
     .order("created_at", { ascending: false });
@@ -210,7 +235,7 @@ export const getChats = async (): Promise<ChatListItem[]> => {
   const [{ data: otherUsers }, { data: messageRows }] = await Promise.all([
     supabase
       .from("users")
-      .select("id,email,full_name,age,city,guru,practices,bio,avatar_url,is_blocked,chat_disabled,created_at")
+      .select("id,email,full_name,gender,seeking_gender,age,city,guru,practices,bio,avatar_url,onboarding_completed,is_blocked,chat_disabled,created_at")
       .in("id", otherIds),
     supabase
       .from("messages")

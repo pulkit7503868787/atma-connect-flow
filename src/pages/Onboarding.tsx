@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { updateUserProfile } from "@/lib/profile";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
+import { getCurrentUserProfile, isProfileComplete } from "@/lib/db";
 
 const TOTAL = 5;
 
@@ -22,6 +23,23 @@ const Onboarding = () => {
 
   const toggle = (arr: string[], setArr: (v: string[]) => void, id: string) =>
     setArr(arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const guardCompletedProfile = async () => {
+      const profile = await getCurrentUserProfile();
+      if (mounted && isProfileComplete(profile)) {
+        nav("/app", { replace: true });
+      }
+    };
+
+    void guardCompletedProfile();
+
+    return () => {
+      mounted = false;
+    };
+  }, [nav]);
 
   const next = async () => {
     if (step < TOTAL - 1) {
@@ -39,10 +57,34 @@ const Onboarding = () => {
       return;
     }
 
+    const existingProfile = await getCurrentUserProfile();
+    const derivedGender =
+      existingProfile?.gender?.trim() ||
+      "unspecified";
+    const derivedSeekingGender =
+      intent === "Bride"
+        ? "female"
+        : intent === "Groom"
+          ? "male"
+          : existingProfile?.seeking_gender?.trim() || "any";
+    const derivedAge = existingProfile?.age ?? 18;
+    const derivedCity = existingProfile?.city?.trim() || "Unknown";
+    const derivedBio =
+      existingProfile?.bio?.trim() ||
+      "On a spiritual journey seeking a conscious connection.";
+    const derivedGuru = guru || existingProfile?.guru || gurus[0]?.id || "spiritual_path";
+    const selectedPractices = prac.length > 0 ? prac : ["daily_sadhana"];
+
     const result = await updateUserProfile(user.id, {
       full_name: name.trim() || null,
-      guru: guru || null,
-      practices: prac,
+      gender: derivedGender,
+      seeking_gender: derivedSeekingGender,
+      age: derivedAge,
+      city: derivedCity,
+      bio: derivedBio,
+      guru: derivedGuru,
+      practices: selectedPractices,
+      onboarding_completed: true,
     });
 
     if (!result.ok) {
