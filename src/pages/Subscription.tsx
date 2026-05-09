@@ -3,11 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Check, Lock, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-<<<<<<< HEAD
 import { startPremiumPayment } from "@/lib/payment";
 import { toast } from "sonner";
-=======
->>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
 
 const plans = [
   { id: "seeker", name: "Seeker", price: "Free", period: "", features: ["5 matches/day", "Community feed", "Basic profile"] },
@@ -17,7 +14,6 @@ const plans = [
 
 const Subscription = () => {
   const [selected, setSelected] = useState("sacred");
-<<<<<<< HEAD
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleUpgradeClick = async () => {
@@ -43,8 +39,6 @@ const Subscription = () => {
 
     toast.success("Premium subscription activated.");
   };
-=======
->>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
 
   return (
     <div className="animate-fade-in pb-8">
@@ -91,11 +85,7 @@ const Subscription = () => {
           ))}
         </div>
 
-<<<<<<< HEAD
         <Button onClick={() => void handleUpgradeClick()} disabled={isProcessing} className="w-full h-13 py-6 mt-6 bg-gradient-saffron text-primary-foreground shadow-warm text-base font-medium">
-=======
-        <Button className="w-full h-13 py-6 mt-6 bg-gradient-saffron text-primary-foreground shadow-warm text-base font-medium">
->>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
           {selected === "seeker" ? "Continue free" : "Begin sacred journey →"}
         </Button>
 

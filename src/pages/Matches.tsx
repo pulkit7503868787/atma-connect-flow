@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
@@ -53,18 +52,6 @@ const Matches = () => {
 
   const hasProfiles = uiProfiles.length > 0;
   const m = hasProfiles ? uiProfiles[idx % uiProfiles.length] : null;
-=======
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { matches } from "@/data/dummy";
-import { PageHeader } from "@/components/PageHeader";
-import { Heart, X, Star, MapPin, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-
-const Matches = () => {
-  const [idx, setIdx] = useState(0);
-  const m = matches[idx % matches.length];
->>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
 
   const advance = () => setIdx((i) => i + 1);
 
@@ -73,13 +60,9 @@ const Matches = () => {
       <PageHeader title="Matches" subtitle="Souls that resonate with yours" />
 
       <div className="px-5 relative">
-<<<<<<< HEAD
         {loading && <p className="text-center text-sm text-muted-foreground py-24">Loading matches...</p>}
         {!loading && !m && <p className="text-center text-sm text-muted-foreground py-24">No matches yet. Check back soon.</p>}
         {m && <div key={m.id} className="relative aspect-[3/4.2] rounded-3xl overflow-hidden shadow-card animate-scale-in">
-=======
-        <div key={m.id} className="relative aspect-[3/4.2] rounded-3xl overflow-hidden shadow-card animate-scale-in">
->>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
           <img src={m.photo} alt={m.name} className="h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
 
@@ -103,11 +86,7 @@ const Matches = () => {
             </div>
             <p className="text-sm mt-3 opacity-90 line-clamp-2 italic font-serif">"{m.bio}"</p>
           </div>
-<<<<<<< HEAD
         </div>}
-=======
-        </div>
->>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
 
         <div className="flex justify-center gap-5 mt-8">
           <button onClick={advance} className="h-14 w-14 rounded-full bg-card border border-border shadow-soft grid place-items-center hover:scale-110 transition-transform">

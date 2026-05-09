@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-<<<<<<< HEAD
 import { Bell, Sparkles, Flame, Calendar } from "lucide-react";
 import mandala from "@/assets/mandala-bg.jpg";
 import { useEffect, useMemo, useState } from "react";
@@ -79,13 +78,6 @@ const Dashboard = () => {
     }
   };
 
-=======
-import { matches } from "@/data/dummy";
-import { Bell, Sparkles, Flame, Calendar } from "lucide-react";
-import mandala from "@/assets/mandala-bg.jpg";
-
-const Dashboard = () => {
->>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
   return (
     <div className="animate-fade-in">
       {/* Welcome */}
@@ -94,7 +86,6 @@ const Dashboard = () => {
         <div className="relative flex items-start justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-primary">Namaste 🙏</p>
-<<<<<<< HEAD
             <h1 className="font-serif text-4xl mt-2 leading-tight">Good morning,<br/><span className="text-gradient-saffron">{myName}</span></h1>
           </div>
           <button onClick={() => void handleBellClick()} className="h-10 w-10 rounded-full bg-card/80 backdrop-blur grid place-items-center relative">
@@ -104,13 +95,6 @@ const Dashboard = () => {
                 {unseenCount > 9 ? "9+" : unseenCount}
               </span>
             )}
-=======
-            <h1 className="font-serif text-4xl mt-2 leading-tight">Good morning,<br/><span className="text-gradient-saffron">Ananya</span></h1>
-          </div>
-          <button className="h-10 w-10 rounded-full bg-card/80 backdrop-blur grid place-items-center relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary" />
->>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
           </button>
         </div>
       </header>
@@ -125,15 +109,9 @@ const Dashboard = () => {
       {/* Stats */}
       <section className="px-5 mt-6 grid grid-cols-3 gap-3">
         {[
-<<<<<<< HEAD
           { icon: Sparkles, label: "Matches", value: String(confirmedCount), tint: "bg-primary/10 text-primary", to: "/app/matches" },
           { icon: Flame, label: "Sent", value: String(sentCount), tint: "bg-accent/20 text-accent", to: "/app" },
           { icon: Calendar, label: "Received", value: String(receivedCount), tint: "bg-secondary text-foreground", to: "/app" },
-=======
-          { icon: Sparkles, label: "Matches", value: "12", tint: "bg-primary/10 text-primary", to: "/app/matches" },
-          { icon: Flame, label: "Streak", value: "47d", tint: "bg-accent/20 text-accent", to: "/app" },
-          { icon: Calendar, label: "Events", value: "3", tint: "bg-secondary text-foreground", to: "/app/events" },
->>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
         ].map((s) => (
           <Link to={s.to} key={s.label} className="glass-card rounded-2xl p-4 text-center hover:shadow-warm transition-all">
             <div className={`h-9 w-9 rounded-xl mx-auto grid place-items-center ${s.tint}`}>
@@ -152,11 +130,7 @@ const Dashboard = () => {
           <Link to="/app/matches" className="text-sm text-primary font-medium">See all →</Link>
         </div>
         <div className="flex gap-4 overflow-x-auto -mx-5 px-5 pb-4 snap-x snap-mandatory scrollbar-none">
-<<<<<<< HEAD
           {suggested.map((m) => (
-=======
-          {matches.map((m) => (
->>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
             <Link key={m.id} to={`/app/profile/${m.id}`} className="snap-start shrink-0 w-44 group">
               <div className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-card">
                 <img src={m.photo} alt={m.name} loading="lazy" className="h-full w-full object-cover transition-transform group-hover:scale-105" />

@@ -3,16 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
-<<<<<<< HEAD
 import { gurus, meditationTypes, practices } from "@/lib/onboardingOptions";
 import { cn } from "@/lib/utils";
 import { updateUserProfile } from "@/lib/profile";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
-=======
-import { gurus, meditationTypes, practices } from "@/data/dummy";
-import { cn } from "@/lib/utils";
->>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
 
 const TOTAL = 5;
 
@@ -28,7 +23,6 @@ const Onboarding = () => {
   const toggle = (arr: string[], setArr: (v: string[]) => void, id: string) =>
     setArr(arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
 
-<<<<<<< HEAD
   const next = async () => {
     if (step < TOTAL - 1) {
       setStep(step + 1);
@@ -58,9 +52,6 @@ const Onboarding = () => {
 
     nav("/app");
   };
-=======
-  const next = () => (step < TOTAL - 1 ? setStep(step + 1) : nav("/app"));
->>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
   const back = () => (step > 0 ? setStep(step - 1) : nav(-1));
 
   return (
@@ -208,11 +199,7 @@ const Onboarding = () => {
 
       <footer className="fixed bottom-0 inset-x-0 p-5 bg-gradient-to-t from-background via-background/95 to-transparent">
         <div className="max-w-md mx-auto">
-<<<<<<< HEAD
           <Button onClick={() => void next()} className="w-full h-13 py-6 bg-gradient-saffron text-primary-foreground shadow-warm text-base font-medium">
-=======
-          <Button onClick={next} className="w-full h-13 py-6 bg-gradient-saffron text-primary-foreground shadow-warm text-base font-medium">
->>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
             {step === TOTAL - 1 ? "Enter AatmamIlan" : "Continue"} <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>

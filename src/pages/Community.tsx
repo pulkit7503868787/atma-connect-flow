@@ -1,14 +1,8 @@
-<<<<<<< HEAD
 import { useEffect, useMemo, useState } from "react";
-=======
-import { useState } from "react";
-import { posts } from "@/data/dummy";
->>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
 import { PageHeader } from "@/components/PageHeader";
 import { Heart, MessageCircle, Share2, Plus, X, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-<<<<<<< HEAD
 import { getAllProfilesExceptMe, getDisplayName, getProfilePhotoUrl, type UserProfileWithCompatibility } from "@/lib/db";
 
 const Community = () => {
@@ -42,13 +36,6 @@ const Community = () => {
     [profiles]
   );
 
-=======
-
-const Community = () => {
-  const [composing, setComposing] = useState(false);
-  const [text, setText] = useState("");
-
->>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
   return (
     <div className="animate-fade-in">
       <PageHeader title="Sangha" subtitle="A community of seekers" action={
@@ -58,11 +45,8 @@ const Community = () => {
       } />
 
       <div className="px-5 space-y-4">
-<<<<<<< HEAD
         {loading && <p className="text-sm text-muted-foreground">Loading posts...</p>}
         {!loading && posts.length === 0 && <p className="text-sm text-muted-foreground">No posts yet.</p>}
-=======
->>>>>>> da101e9a528a6a7e757745cde99a6b6840993682
         {posts.map((p, i) => (
           <article key={p.id} className="glass-card rounded-2xl p-5 animate-fade-in" style={{ animationDelay: `${i * 0.05}s` }}>
             <div className="flex items-center gap-3">
