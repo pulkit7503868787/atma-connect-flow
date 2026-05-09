@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Heart, X, Star, MapPin, Sparkles, MessageCircle } from "lucide-react";
 import {
@@ -14,10 +14,12 @@ import {
 } from "@/lib/db";
 import { getConfirmedMatchesForUser, type RankedMatch, type MatchingUser } from "@/lib/matching";
 import { acceptIncomingRequest, getReceivedRequests, getSentRequests, rejectIncomingRequest } from "@/lib/likes";
+import { createOrGetChat } from "@/lib/chat";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 const Matches = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const view = searchParams.get("view");
 
@@ -94,6 +96,19 @@ const Matches = () => {
   const m = hasProfiles ? uiProfiles[idx % uiProfiles.length] : null;
 
   const advance = () => setIdx((i) => i + 1);
+
+  const openChatWithMatch = async (otherUserId: string) => {
+    if (!me?.id) {
+      toast.error("Please sign in again.");
+      return;
+    }
+    const { chatId, error } = await createOrGetChat(me.id, otherUserId);
+    if (!chatId) {
+      toast.error(error ?? "Could not open chat.");
+      return;
+    }
+    navigate(`/app/chat/${chatId}`);
+  };
 
   const handleAccept = async (senderId: string) => {
     if (!me?.id) {
@@ -297,7 +312,7 @@ const Matches = () => {
           </button>
           <button
             type="button"
-            onClick={advance}
+            onClick={() => m && void openChatWithMatch(m.id)}
             className="h-16 w-16 rounded-full bg-gradient-saffron shadow-warm grid place-items-center hover:scale-110 transition-transform"
           >
             <Heart className="h-7 w-7 text-primary-foreground" fill="currentColor" />

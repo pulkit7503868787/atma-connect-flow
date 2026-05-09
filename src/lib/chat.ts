@@ -10,32 +10,44 @@ export type DbMessage = {
   created_at: string;
 };
 
-export const createOrGetChat = async (user1_id: string, user2_id: string) => {
+export type CreateOrGetChatResult = {
+  chatId: string | null;
+  error: string | null;
+};
+
+export const createOrGetChat = async (user1_id: string, user2_id: string): Promise<CreateOrGetChatResult> => {
   if (!user1_id || !user2_id || user1_id === user2_id) {
-    return null;
+    return { chatId: null, error: "Invalid chat participants." };
   }
 
-  const { data: existing } = await supabase
+  const { data: existing, error: findError } = await supabase
     .from("chats")
     .select("id")
     .or(`and(user1_id.eq.${user1_id},user2_id.eq.${user2_id}),and(user1_id.eq.${user2_id},user2_id.eq.${user1_id})`)
     .maybeSingle();
 
-  if (existing?.id) {
-    return existing.id;
+  if (findError) {
+    return { chatId: null, error: findError.message };
   }
+
+  if (existing?.id) {
+    return { chatId: existing.id, error: null };
+  }
+
+  const ordered1 = user1_id < user2_id ? user1_id : user2_id;
+  const ordered2 = user1_id < user2_id ? user2_id : user1_id;
 
   const { data: created, error } = await supabase
     .from("chats")
-    .insert({ user1_id, user2_id })
+    .insert({ user1_id: ordered1, user2_id: ordered2 })
     .select("id")
     .single();
 
   if (error || !created) {
-    return null;
+    return { chatId: null, error: error?.message ?? "Could not create chat." };
   }
 
-  return created.id;
+  return { chatId: created.id, error: null };
 };
 
 export type SendMessageResult =

@@ -19,7 +19,7 @@ import {
 } from "@/lib/db";
 import { createOrGetChat } from "@/lib/chat";
 import { useNavigate } from "react-router-dom";
-import { hasUserLiked, likeUser, rejectIncomingRequest } from "@/lib/likes";
+import { checkMutualMatch, hasUserLiked, likeUser, rejectIncomingRequest } from "@/lib/likes";
 import { signOutUser } from "@/lib/auth";
 import { updateUserProfile } from "@/lib/profile";
 import { uploadProfileImage } from "@/lib/profileStorage";
@@ -43,6 +43,7 @@ const Profile = () => {
   const [others, setOthers] = useState<UserProfileWithCompatibility[]>([]);
   const [loading, setLoading] = useState(true);
   const [isReceivedRequest, setIsReceivedRequest] = useState(false);
+  const [isMutualMatched, setIsMutualMatched] = useState(false);
   const isOwn = !id;
 
   const [editName, setEditName] = useState("");
@@ -110,15 +111,18 @@ const Profile = () => {
     const loadRequestState = async () => {
       if (!me?.id || !id) {
         setIsReceivedRequest(false);
+        setIsMutualMatched(false);
         return;
       }
 
-      const [theyLikedMe, iLikedThem] = await Promise.all([
+      const [mutual, theyLikedMe, iLikedThem] = await Promise.all([
+        checkMutualMatch(me.id, id),
         hasUserLiked(id, me.id),
         hasUserLiked(me.id, id),
       ]);
 
-      setIsReceivedRequest(theyLikedMe && !iLikedThem);
+      setIsMutualMatched(mutual);
+      setIsReceivedRequest(Boolean(!mutual && theyLikedMe && !iLikedThem));
     };
 
     void loadRequestState();
@@ -225,13 +229,28 @@ const Profile = () => {
       return;
     }
 
-    const chatId = await createOrGetChat(me.id, id);
+    const { chatId, error: chatErr } = await createOrGetChat(me.id, id);
     if (!chatId) {
-      toast.error("Matched, but chat could not be opened.");
+      toast.error(chatErr ?? "Matched, but chat could not be opened.");
       return;
     }
 
+    setIsMutualMatched(true);
     toast.success("It's a match! Chat unlocked.");
+    nav(`/app/chat/${chatId}`);
+  };
+
+  const handleOpenChat = async () => {
+    if (!me?.id || !id) {
+      return;
+    }
+
+    const { chatId, error: chatErr } = await createOrGetChat(me.id, id);
+    if (!chatId) {
+      toast.error(chatErr ?? "Could not open chat.");
+      return;
+    }
+
     nav(`/app/chat/${chatId}`);
   };
 
@@ -463,14 +482,20 @@ const Profile = () => {
               </div>
             </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <Button onClick={() => void handleReject()} variant="outline" className="h-12 border-border/60 bg-card">
-                <Heart className="h-4 w-4 mr-2 text-primary" /> Bless
+            {isMutualMatched ? (
+              <Button onClick={() => void handleOpenChat()} className="mt-6 w-full h-12 bg-gradient-saffron text-primary-foreground shadow-warm">
+                <MessageCircle className="h-4 w-4 mr-2" /> Open Chat
               </Button>
-              <Button onClick={() => void handleConnect()} className="h-12 bg-gradient-saffron text-primary-foreground shadow-warm">
-                <MessageCircle className="h-4 w-4 mr-2" /> Connect
-              </Button>
-            </div>
+            ) : (
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <Button onClick={() => void handleReject()} variant="outline" className="h-12 border-border/60 bg-card">
+                  <Heart className="h-4 w-4 mr-2 text-primary" /> Bless
+                </Button>
+                <Button onClick={() => void handleConnect()} className="h-12 bg-gradient-saffron text-primary-foreground shadow-warm">
+                  <MessageCircle className="h-4 w-4 mr-2" /> Connect
+                </Button>
+              </div>
+            )}
           </div>
         </>
       )}
