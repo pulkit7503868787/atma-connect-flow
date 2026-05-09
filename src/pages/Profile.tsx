@@ -19,7 +19,7 @@ import {
 } from "@/lib/db";
 import { createOrGetChat } from "@/lib/chat";
 import { useNavigate } from "react-router-dom";
-import { hasUserLiked, likeUser } from "@/lib/likes";
+import { hasUserLiked, likeUser, rejectIncomingRequest } from "@/lib/likes";
 import { signOutUser } from "@/lib/auth";
 import { updateUserProfile } from "@/lib/profile";
 import { uploadProfileImage } from "@/lib/profileStorage";
@@ -235,8 +235,18 @@ const Profile = () => {
     nav(`/app/chat/${chatId}`);
   };
 
-  const handleReject = () => {
-    toast.success(isReceivedRequest ? "Request ignored." : "Bless sent.");
+  const handleReject = async () => {
+    if (isReceivedRequest && me?.id && id) {
+      const result = await rejectIncomingRequest(me.id, id);
+      if (!result.ok) {
+        toast.error(result.error ?? "Could not decline request.");
+        return;
+      }
+      toast.success("Request ignored.");
+      nav("/app/matches?view=received", { replace: true });
+      return;
+    }
+    toast.success("Bless sent.");
   };
 
   const handleLogout = async () => {
@@ -454,7 +464,7 @@ const Profile = () => {
             </div>
 
             <div className="mt-6 grid grid-cols-2 gap-3">
-              <Button onClick={handleReject} variant="outline" className="h-12 border-border/60 bg-card">
+              <Button onClick={() => void handleReject()} variant="outline" className="h-12 border-border/60 bg-card">
                 <Heart className="h-4 w-4 mr-2 text-primary" /> Bless
               </Button>
               <Button onClick={() => void handleConnect()} className="h-12 bg-gradient-saffron text-primary-foreground shadow-warm">

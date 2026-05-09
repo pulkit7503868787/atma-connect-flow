@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Bell, Sparkles, Flame, Calendar } from "lucide-react";
 import mandala from "@/assets/mandala-bg.jpg";
 import { useEffect, useMemo, useState } from "react";
@@ -13,16 +13,31 @@ import {
   type UserProfileWithCompatibility,
 } from "@/lib/db";
 import { getMatches, getReceivedRequests, getSentRequests } from "@/lib/likes";
-import { getUnseenNotificationCount, markNotificationsSeen } from "@/lib/notifications";
+import {
+  getNotifications,
+  getUnseenNotificationCount,
+  markNotificationSeenById,
+  markNotificationsSeen,
+  type AppNotification,
+} from "@/lib/notifications";
 import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [me, setMe] = useState<UserProfile | null>(null);
   const [matches, setMatches] = useState<UserProfileWithCompatibility[]>([]);
   const [sentCount, setSentCount] = useState(0);
   const [receivedCount, setReceivedCount] = useState(0);
   const [confirmedCount, setConfirmedCount] = useState(0);
   const [unseenCount, setUnseenCount] = useState(0);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -34,19 +49,22 @@ const Dashboard = () => {
         setSentCount(0);
         setReceivedCount(0);
         setConfirmedCount(0);
+        setNotifications([]);
         return;
       }
 
-      const [sent, received, confirmed] = await Promise.all([
+      const [sent, received, confirmed, unseen, notifRows] = await Promise.all([
         getSentRequests(myProfile.id),
         getReceivedRequests(myProfile.id),
         getMatches(myProfile.id),
+        getUnseenNotificationCount(myProfile.id),
+        getNotifications(myProfile.id),
       ]);
       setSentCount(sent.length);
       setReceivedCount(received.count);
       setConfirmedCount(confirmed.length);
-      const unseen = await getUnseenNotificationCount(myProfile.id);
       setUnseenCount(unseen);
+      setNotifications(notifRows);
     };
 
     void load();
@@ -66,16 +84,54 @@ const Dashboard = () => {
   );
   const myName = me ? getDisplayName(me) : "Seeker";
 
-  const handleBellClick = async () => {
+  const handleOpenBell = (open: boolean) => {
+    if (open && me?.id) {
+      void getNotifications(me.id).then(setNotifications);
+    }
+  };
+
+  const handleNotificationNavigate = async (n: AppNotification) => {
     if (!me?.id) {
       return;
     }
+    await markNotificationSeenById(me.id, n.id);
+    setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, seen: true } : x)));
+    const unseen = await getUnseenNotificationCount(me.id);
+    setUnseenCount(unseen);
 
+    if (n.type === "message" && n.reference_id) {
+      navigate(`/app/chat/${n.reference_id}`);
+      return;
+    }
+    if ((n.type === "like" || n.type === "match") && n.reference_id) {
+      navigate(`/app/profile/${n.reference_id}`);
+      return;
+    }
+    navigate("/app");
+  };
+
+  const handleMarkAllNotificationsSeen = async () => {
+    if (!me?.id) {
+      return;
+    }
     const ok = await markNotificationsSeen(me.id);
     if (ok) {
       setUnseenCount(0);
+      setNotifications((prev) => prev.map((x) => ({ ...x, seen: true })));
       toast.success("Notifications marked as seen.");
+    } else {
+      toast.error("Could not update notifications.");
     }
+  };
+
+  const notificationLabel = (n: AppNotification) => {
+    if (n.type === "like") {
+      return "New connection request";
+    }
+    if (n.type === "match") {
+      return "New match";
+    }
+    return "New message";
   };
 
   return (
@@ -88,14 +144,35 @@ const Dashboard = () => {
             <p className="text-xs uppercase tracking-[0.3em] text-primary">Namaste 🙏</p>
             <h1 className="font-serif text-4xl mt-2 leading-tight">Good morning,<br/><span className="text-gradient-saffron">{myName}</span></h1>
           </div>
-          <button onClick={() => void handleBellClick()} className="h-10 w-10 rounded-full bg-card/80 backdrop-blur grid place-items-center relative">
-            <Bell className="h-5 w-5" />
-            {unseenCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 min-w-4 h-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold grid place-items-center">
-                {unseenCount > 9 ? "9+" : unseenCount}
-              </span>
-            )}
-          </button>
+          <DropdownMenu onOpenChange={handleOpenBell}>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="h-10 w-10 rounded-full bg-card/80 backdrop-blur grid place-items-center relative">
+                <Bell className="h-5 w-5" />
+                {unseenCount > 0 && (
+                  <span className="absolute top-1.5 right-1.5 min-w-4 h-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold grid place-items-center">
+                    {unseenCount > 9 ? "9+" : unseenCount}
+                  </span>
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72 max-h-64 overflow-y-auto">
+              {notifications.length === 0 && <div className="px-2 py-3 text-sm text-muted-foreground">No notifications yet.</div>}
+              {notifications.map((n) => (
+                <DropdownMenuItem key={n.id} className="cursor-pointer flex flex-col items-start gap-0.5" onClick={() => void handleNotificationNavigate(n)}>
+                  <span className="font-medium">{notificationLabel(n)}</span>
+                  <span className="text-xs text-muted-foreground">{new Date(n.created_at).toLocaleString()}</span>
+                </DropdownMenuItem>
+              ))}
+              {notifications.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="cursor-pointer" onClick={() => void handleMarkAllNotificationsSeen()}>
+                    Mark all as read
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
@@ -110,8 +187,8 @@ const Dashboard = () => {
       <section className="px-5 mt-6 grid grid-cols-3 gap-3">
         {[
           { icon: Sparkles, label: "Matches", value: String(confirmedCount), tint: "bg-primary/10 text-primary", to: "/app/matches" },
-          { icon: Flame, label: "Sent", value: String(sentCount), tint: "bg-accent/20 text-accent", to: "/app" },
-          { icon: Calendar, label: "Received", value: String(receivedCount), tint: "bg-secondary text-foreground", to: "/app" },
+          { icon: Flame, label: "Sent", value: String(sentCount), tint: "bg-accent/20 text-accent", to: "/app/matches?view=sent" },
+          { icon: Calendar, label: "Received", value: String(receivedCount), tint: "bg-secondary text-foreground", to: "/app/matches?view=received" },
         ].map((s) => (
           <Link to={s.to} key={s.label} className="glass-card rounded-2xl p-4 text-center hover:shadow-warm transition-all">
             <div className={`h-9 w-9 rounded-xl mx-auto grid place-items-center ${s.tint}`}>
@@ -127,7 +204,9 @@ const Dashboard = () => {
       <section className="px-5 mt-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-serif text-2xl">Suggested for you</h2>
-          <Link to="/app/matches" className="text-sm text-primary font-medium">See all →</Link>
+          <Link to="/app/matches?view=suggestions" className="text-sm text-primary font-medium">
+            See all →
+          </Link>
         </div>
         <div className="flex gap-4 overflow-x-auto -mx-5 px-5 pb-4 snap-x snap-mandatory scrollbar-none">
           {suggested.map((m) => (

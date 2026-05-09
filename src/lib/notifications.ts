@@ -82,3 +82,20 @@ export const markNotificationsSeen = async (userId: string) => {
 
   return !error;
 };
+
+export const markNotificationSeenById = async (
+  userId: string,
+  notificationId: string
+): Promise<{ ok: boolean; error: string | null }> => {
+  if (!(await isSameAuthUser(userId))) {
+    return { ok: false, error: "Unauthorized." };
+  }
+
+  const { error } = await supabase
+    .from("notifications")
+    .update({ seen: true })
+    .eq("id", notificationId)
+    .eq("user_id", userId);
+
+  return { ok: !error, error: error?.message ?? null };
+};

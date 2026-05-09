@@ -168,11 +168,6 @@ export const getReceivedRequests = async (userId: string): Promise<ReceivedReque
     return { count: 0, users: [] };
   }
 
-  const premium = await isPremium(userId);
-  if (!premium) {
-    return { count: pendingIds.length, users: [] };
-  }
-
   const { data: usersRows, error: usersError } = await supabase
     .from("users")
     .select("id,email,full_name,age,city,guru,practices,bio,avatar_url,is_blocked,created_at")
@@ -367,4 +362,35 @@ export const likeUser = async (liker_id: string, liked_id: string): Promise<Like
   }
 
   return { ok: true, mutualMatch: false, alreadyLiked: false, reason: null, error: null };
+};
+
+/** Recipient accepts an incoming pending request (same outcome as Connect on profile). */
+export const acceptIncomingRequest = async (recipientId: string, senderId: string): Promise<LikeUserResult> =>
+  likeUser(recipientId, senderId);
+
+export const rejectIncomingRequest = async (
+  recipientId: string,
+  senderId: string
+): Promise<{ ok: boolean; error: string | null }> => {
+  if (!(await isSameAuthUser(recipientId))) {
+    return { ok: false, error: "Unauthorized." };
+  }
+
+  const { data: row, error: fetchError } = await fetchMatchRowForPair(recipientId, senderId);
+
+  if (fetchError) {
+    return { ok: false, error: fetchError.message };
+  }
+
+  if (!row || row.status !== "pending" || row.requested_by !== senderId) {
+    return { ok: false, error: "No pending request from this user." };
+  }
+
+  const { error: delError } = await supabase.from("matches").delete().eq("id", row.id);
+
+  if (delError) {
+    return { ok: false, error: delError.message };
+  }
+
+  return { ok: true, error: null };
 };
