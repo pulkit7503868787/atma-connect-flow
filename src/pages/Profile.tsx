@@ -454,7 +454,7 @@ const Profile = () => {
         return;
       }
       toast.success("Request ignored.");
-      nav("/app/matches#soul-requests", { replace: true });
+      nav("/app/matches#soul-invitations-received", { replace: true });
       return;
     }
     toast.success("Bless sent.");

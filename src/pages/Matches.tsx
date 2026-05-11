@@ -27,6 +27,7 @@ import { addToShortlist, getShortlistedUserIds, removeFromShortlist, getShortlis
 import { createOrGetChat } from "@/lib/chat";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { DiscoverySwipeSurface } from "@/components/connections/DiscoverySwipeSurface";
 
 const soulRow = (u: MatchingUser) => (
   <Link key={u.id} to={`/app/profile/${u.id}`} className="flex items-center gap-3 min-w-0">
@@ -42,6 +43,7 @@ const soulRow = (u: MatchingUser) => (
 
 function FlowSection({
   sectionId,
+  variant,
   eyebrow,
   title,
   description,
@@ -51,6 +53,7 @@ function FlowSection({
   children,
 }: {
   sectionId: string;
+  variant: "field" | "threshold" | "bond" | "keep" | "release";
   eyebrow: string;
   title: string;
   description?: string;
@@ -59,20 +62,32 @@ function FlowSection({
   loading: boolean;
   children: ReactNode;
 }) {
+  const shell = {
+    field: "border-primary/12 bg-card/35 shadow-soft",
+    threshold: "border-amber-900/12 bg-gradient-to-b from-card via-card to-secondary/25 shadow-soft",
+    bond: "border-primary/20 bg-card/45 shadow-card",
+    keep: "border-accent/18 bg-card/30 shadow-soft",
+    release: "border-border/55 bg-muted/10 shadow-soft",
+  }[variant];
+
   return (
-    <section id={sectionId} className="scroll-mt-24 space-y-3">
-      <div className="px-1">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{eyebrow}</p>
-        <h2 className="font-serif text-xl mt-1">{title}</h2>
-        {description ? <p className="text-sm text-muted-foreground mt-1">{description}</p> : null}
+    <section id={sectionId} className="scroll-mt-28">
+      <div className={`rounded-[1.75rem] border p-4 sm:p-5 space-y-4 ${shell}`}>
+        <div className="px-0.5 space-y-1">
+          <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">{eyebrow}</p>
+          <h2 className="font-serif text-2xl leading-tight">{title}</h2>
+          {description ? <p className="text-sm text-muted-foreground leading-relaxed pt-1">{description}</p> : null}
+        </div>
+        {loading ? (
+          <p className="text-sm text-muted-foreground px-0.5">Loading…</p>
+        ) : isEmpty ? (
+          <div className="rounded-2xl border border-dashed border-border/60 bg-background/40 p-7 text-center text-sm text-muted-foreground leading-relaxed">
+            {emptyText}
+          </div>
+        ) : (
+          <div className="space-y-4">{children}</div>
+        )}
       </div>
-      {loading ? (
-        <p className="text-sm text-muted-foreground px-1">Loading…</p>
-      ) : isEmpty ? (
-        <div className="glass-card rounded-2xl p-6 shadow-card text-center text-sm text-muted-foreground">{emptyText}</div>
-      ) : (
-        <div className="space-y-4">{children}</div>
-      )}
     </section>
   );
 }
@@ -358,71 +373,85 @@ const Matches = () => {
 
   return (
     <div className="animate-fade-in pb-28">
-      <PageHeader title="Connections" subtitle="Discovery, soul requests, and sacred bonds" />
+      <PageHeader
+        title="Connections"
+        subtitle="A calm workspace for discovery, invitations, and bonds — distinct steps, one intentional flow."
+      />
 
-      <div className="px-5 space-y-12 pt-2">
+      <div className="px-5 space-y-14 pt-2">
         <FlowSection
           sectionId="discovery"
-          eyebrow="Step one"
+          variant="field"
+          eyebrow="Open field"
           title="Discovery"
-          description="Souls you have not yet greeted, passed, or paired with."
+          description="Souls you have not yet greeted, passed, or paired with. Gently swipe on the portrait — left to release, right to invite, upward to bless — or use the buttons below."
           emptyText="No new souls in the circle right now. Return after sadhana — the field will refresh."
           isEmpty={!loading && !hasProfiles}
           loading={loading}
         >
           <div className="relative aspect-[3/4.2] rounded-3xl overflow-hidden shadow-card animate-scale-in">
             {m ? (
-              <>
-                <img src={m.photo} alt={m.name} className="h-full w-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-                <div className="absolute top-4 left-4 right-4 flex justify-between items-start gap-2">
-                  <span className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-semibold text-primary flex items-center gap-1 shrink-0">
-                    <Sparkles className="h-3 w-3" /> {m.compatibility}% aligned
-                  </span>
-                  <div className="flex flex-col items-end gap-1.5 shrink-0">
-                    <Link to={`/app/profile/${m.id}`} className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-medium">
-                      View profile
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => void handleToggleShortlist(m.id)}
-                      className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-medium flex items-center gap-1"
-                    >
-                      <Bookmark className="h-3 w-3" fill={shortlistedIds.has(m.id) ? "currentColor" : "none"} />
-                      {shortlistedIds.has(m.id) ? "Shortlisted" : "Shortlist"}
-                    </button>
+              <DiscoverySwipeSurface
+                disabled={loading}
+                onPass={() => void handlePass(m.id)}
+                onConnect={() => void handleLike(m.id)}
+                onBless={() => void handleSuperLike(m.id)}
+              >
+                <div className="relative h-full w-full">
+                  <img src={m.photo} alt={m.name} className="absolute inset-0 h-full w-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                  <div className="absolute top-4 left-4 right-4 flex justify-between items-start gap-2 z-20">
+                    <span className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-semibold text-primary flex items-center gap-1 shrink-0 border border-primary/10">
+                      <Sparkles className="h-3 w-3" /> {m.compatibility}% aligned
+                    </span>
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <Link
+                        to={`/app/profile/${m.id}`}
+                        className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-medium border border-border/50"
+                      >
+                        View profile
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => void handleToggleShortlist(m.id)}
+                        className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-medium flex items-center gap-1 border border-border/50"
+                      >
+                        <Bookmark className="h-3 w-3" fill={shortlistedIds.has(m.id) ? "currentColor" : "none"} />
+                        {shortlistedIds.has(m.id) ? "Shortlisted" : "Shortlist"}
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="absolute bottom-0 inset-x-0 p-6 text-ivory">
-                  <h3 className="font-serif text-4xl leading-none">
-                    {m.name}, {m.age}
-                  </h3>
-                  <p className="flex items-center gap-1.5 text-sm opacity-90 mt-2">
-                    <MapPin className="h-3.5 w-3.5" /> {m.location}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    <span className="px-2.5 py-1 rounded-full bg-primary/90 text-primary-foreground text-[11px] font-medium">{m.guru}</span>
-                    {m.practices.slice(0, 2).map((p) => (
-                      <span key={p} className="px-2.5 py-1 rounded-full bg-white/15 backdrop-blur text-white text-[11px] font-medium">
-                        {p}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="text-sm mt-3 opacity-90 line-clamp-2 italic font-serif">&quot;{m.bio}&quot;</p>
-                  {m.matchReasons?.length ? (
-                    <ul className="mt-3 space-y-1 text-[11px] leading-snug opacity-90 border-t border-white/10 pt-3">
-                      {m.matchReasons.slice(0, 3).map((reason) => (
-                        <li key={reason} className="flex gap-2">
-                          <span className="text-primary shrink-0" aria-hidden>
-                            ·
-                          </span>
-                          <span>{reason}</span>
-                        </li>
+                  <div className="absolute bottom-0 inset-x-0 p-6 text-ivory z-10 pointer-events-none">
+                    <h3 className="font-serif text-4xl leading-none">
+                      {m.name}, {m.age}
+                    </h3>
+                    <p className="flex items-center gap-1.5 text-sm opacity-90 mt-2">
+                      <MapPin className="h-3.5 w-3.5" /> {m.location}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      <span className="px-2.5 py-1 rounded-full bg-primary/90 text-primary-foreground text-[11px] font-medium">{m.guru}</span>
+                      {m.practices.slice(0, 2).map((p) => (
+                        <span key={p} className="px-2.5 py-1 rounded-full bg-white/15 backdrop-blur text-white text-[11px] font-medium">
+                          {p}
+                        </span>
                       ))}
-                    </ul>
-                  ) : null}
+                    </div>
+                    <p className="text-sm mt-3 opacity-90 line-clamp-2 italic font-serif">&quot;{m.bio}&quot;</p>
+                    {m.matchReasons?.length ? (
+                      <ul className="mt-3 space-y-1 text-[11px] leading-snug opacity-90 border-t border-white/10 pt-3">
+                        {m.matchReasons.slice(0, 3).map((reason) => (
+                          <li key={reason} className="flex gap-2">
+                            <span className="text-primary shrink-0" aria-hidden>
+                              ·
+                            </span>
+                            <span>{reason}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
                 </div>
-              </>
+              </DiscoverySwipeSurface>
             ) : null}
           </div>
 
@@ -432,41 +461,44 @@ const Matches = () => {
                 <button
                   type="button"
                   onClick={() => void handlePass(m.id)}
-                  className="h-14 w-14 rounded-full bg-card border border-border shadow-soft grid place-items-center hover:scale-110 transition-transform"
+                  className="h-14 w-14 rounded-full bg-card border border-border shadow-soft grid place-items-center hover:scale-[1.04] transition-transform duration-300"
                 >
                   <X className="h-6 w-6 text-muted-foreground" />
                 </button>
                 <button
                   type="button"
                   onClick={() => void handleLike(m.id)}
-                  className="h-16 w-16 rounded-full bg-gradient-saffron shadow-warm grid place-items-center hover:scale-110 transition-transform"
+                  className="h-16 w-16 rounded-full bg-gradient-saffron shadow-warm grid place-items-center hover:scale-[1.04] transition-transform duration-300"
                 >
                   <Heart className="h-7 w-7 text-primary-foreground" fill="currentColor" />
                 </button>
                 <button
                   type="button"
                   onClick={() => void handleSuperLike(m.id)}
-                  className="h-14 w-14 rounded-full bg-card border border-border shadow-soft grid place-items-center hover:scale-110 transition-transform"
+                  className="h-14 w-14 rounded-full bg-card border border-border shadow-soft grid place-items-center hover:scale-[1.04] transition-transform duration-300"
                 >
                   <Star className="h-6 w-6 text-accent" fill="currentColor" />
                 </button>
               </div>
-              <p className="text-center text-xs text-muted-foreground mt-4 italic">Pass · Connect · Super-bless</p>
+              <p className="text-center text-xs text-muted-foreground mt-4 italic leading-relaxed">
+                Buttons stay as your anchor · soft gestures on the portrait echo the same intentions
+              </p>
             </>
           ) : null}
         </FlowSection>
 
         <FlowSection
-          sectionId="soul-requests"
-          eyebrow="Awaiting your heart"
-          title="Soul requests"
-          description="Incoming invitations — accept to open the path, or release with kindness."
+          sectionId="soul-invitations-received"
+          variant="threshold"
+          eyebrow="At your threshold"
+          title="Soul invitations received"
+          description="Another seeker has offered a connection. Receive with clarity, or release with kindness."
           emptyText="No soul is knocking at your door yet. Your presence in the sangha is enough."
           isEmpty={!loading && incoming.length === 0}
           loading={loading}
         >
           {incoming.map((u) => (
-            <div key={u.id} className="glass-card rounded-2xl p-5 shadow-card flex flex-col gap-4">
+            <div key={u.id} className="rounded-2xl border border-border/50 bg-card/60 p-5 flex flex-col gap-4 shadow-soft">
               {soulRow(u)}
               <div className="grid grid-cols-2 gap-3">
                 <Button type="button" variant="outline" className="h-12 border-border/60 bg-card" onClick={() => void handleRejectIncoming(u.id)}>
@@ -481,16 +513,17 @@ const Matches = () => {
         </FlowSection>
 
         <FlowSection
-          sectionId="sent-invitations"
+          sectionId="invitations-sent"
+          variant="threshold"
           eyebrow="Offered in faith"
-          title="Sent invitations"
-          description="Requests you have sent — the other soul has not yet answered."
+          title="Invitations sent"
+          description="Requests you have offered — the other soul has not yet answered. Trust the silence between hearts."
           emptyText="You have not offered a connection yet. Discovery is where the first step lives."
           isEmpty={!loading && outgoing.length === 0}
           loading={loading}
         >
           {outgoing.map((u) => (
-            <div key={u.id} className="glass-card rounded-2xl p-5 shadow-card flex flex-col gap-3">
+            <div key={u.id} className="rounded-2xl border border-border/50 bg-card/50 p-5 flex flex-col gap-3 shadow-soft">
               {soulRow(u)}
               <p className="text-xs text-muted-foreground">Awaiting their response — trust the timing.</p>
             </div>
@@ -499,15 +532,16 @@ const Matches = () => {
 
         <FlowSection
           sectionId="sacred-connections"
+          variant="bond"
           eyebrow="Mutual recognition"
           title="Sacred connections"
-          description="Matched souls — chat is open between you."
+          description="Matched souls — dialogue may open here with reverence."
           emptyText="When two hearts align, they will appear here. Until then, keep walking in truth."
           isEmpty={!loading && confirmedMatches.length === 0}
           loading={loading}
         >
           {confirmedMatches.map((u) => (
-            <div key={u.id} className="glass-card rounded-2xl p-5 shadow-card flex flex-col gap-3">
+            <div key={u.id} className="rounded-2xl border border-primary/15 bg-card/70 p-5 flex flex-col gap-3 shadow-card">
               {soulRow(u)}
               <Button
                 type="button"
@@ -521,7 +555,28 @@ const Matches = () => {
         </FlowSection>
 
         <FlowSection
+          sectionId="shortlisted-souls"
+          variant="keep"
+          eyebrow="Held gently"
+          title="Shortlisted souls"
+          description="Souls you marked to revisit — they rest here and step out of Discovery until you release them."
+          emptyText="Shortlist a soul from Discovery to keep their light close while you discern."
+          isEmpty={!loading && shortlistedProfiles.length === 0}
+          loading={loading}
+        >
+          {shortlistedProfiles.map((u) => (
+            <div key={u.id} className="rounded-2xl border border-accent/20 bg-card/55 p-5 flex flex-col gap-3 shadow-soft">
+              {soulRow(u)}
+              <Button type="button" variant="outline" className="h-11 border-border/60 bg-card" onClick={() => void handleRemoveShortlistRow(u.id)}>
+                Remove from shortlist
+              </Button>
+            </div>
+          ))}
+        </FlowSection>
+
+        <FlowSection
           sectionId="passed-souls"
+          variant="release"
           eyebrow="Released with respect"
           title="Passed souls"
           description="Profiles you passed or gently declined — they rest outside Discovery for now."
@@ -530,27 +585,8 @@ const Matches = () => {
           loading={loading}
         >
           {passedProfiles.map((u) => (
-            <div key={u.id} className="glass-card rounded-2xl p-5 shadow-card">
+            <div key={u.id} className="rounded-2xl border border-border/45 bg-background/50 p-5 shadow-soft">
               {soulRow(u)}
-            </div>
-          ))}
-        </FlowSection>
-
-        <FlowSection
-          sectionId="shortlist"
-          eyebrow="Held in your heart"
-          title="Shortlisted"
-          description="Souls you marked to revisit — they stay here and step out of Discovery until you release them."
-          emptyText="Shortlist a soul from Discovery to keep their light close while you discern."
-          isEmpty={!loading && shortlistedProfiles.length === 0}
-          loading={loading}
-        >
-          {shortlistedProfiles.map((u) => (
-            <div key={u.id} className="glass-card rounded-2xl p-5 shadow-card flex flex-col gap-3">
-              {soulRow(u)}
-              <Button type="button" variant="outline" className="h-11 border-border/60 bg-card" onClick={() => void handleRemoveShortlistRow(u.id)}>
-                Remove from shortlist
-              </Button>
             </div>
           ))}
         </FlowSection>

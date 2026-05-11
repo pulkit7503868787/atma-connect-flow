@@ -200,6 +200,29 @@ export const isProfileComplete = (profile: UserProfile | null) => {
   );
 };
 
+/** Curated profile depth for dashboard journey card (0–100). */
+export const getProfileCompletionPercent = (profile: UserProfile | null): number => {
+  if (!profile) {
+    return 0;
+  }
+  const checks = [
+    hasText(profile.gender),
+    hasText(profile.seeking_gender),
+    profile.age != null,
+    hasText(profile.city),
+    hasText(profile.bio),
+    hasText(profile.guru),
+    profile.practices.length > 0,
+    profile.onboarding_completed,
+    hasText(profile.spiritual_path),
+    Boolean(profile.avatar_url?.trim()),
+    profile.spiritual_values.length > 0,
+    hasText(profile.sadhana_frequency),
+  ];
+  const done = checks.filter(Boolean).length;
+  return Math.round((done / checks.length) * 100);
+};
+
 const indexFromId = (id: string) =>
   id.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
 
