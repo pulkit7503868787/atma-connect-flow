@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabaseClient";
 import { getDisplayName, getProfilePhotoUrl, type UserProfile } from "@/lib/db";
+import { getCommunityPostImagePublicUrl } from "@/lib/postStorage";
 
 export type Post = {
   id: string;
@@ -46,8 +47,14 @@ const enrichPosts = async (rows: { id: string; user_id: string; content: string;
 
   return rows.map((row) => {
     const u = userMap.get(row.user_id);
+    const imageUrl = row.image_url?.trim()
+      ? row.image_url.trim().startsWith("http")
+        ? row.image_url.trim()
+        : getCommunityPostImagePublicUrl(row.image_url.trim())
+      : null;
     return {
       ...row,
+      image_url: imageUrl,
       author_name: u ? getDisplayName(u as UserProfile) : "Seeker",
       author_avatar: u ? getProfilePhotoUrl(u as unknown as Pick<UserProfile, "id" | "avatar_url">) : "",
       liked_by_me: likedPostIds.has(row.id),
@@ -72,9 +79,15 @@ export const createPost = async (content: string, imageUrl?: string | null): Pro
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Unauthorized" };
 
+  const trimmed = content.trim();
+  const body = trimmed || (imageUrl ? "Shared with the sangha." : "");
+  if (!body && !imageUrl) {
+    return { ok: false, error: "Write something or add an image." };
+  }
+
   const { data, error } = await supabase
     .from("posts")
-    .insert({ user_id: user.id, content: content.trim(), image_url: imageUrl ?? null })
+    .insert({ user_id: user.id, content: body, image_url: imageUrl ?? null })
     .select("id,user_id,content,image_url,likes_count,comments_count,created_at")
     .single();
 

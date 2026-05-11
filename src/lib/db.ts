@@ -3,6 +3,7 @@ import p2 from "@/assets/profile-2.jpg";
 import p3 from "@/assets/profile-3.jpg";
 import p4 from "@/assets/profile-4.jpg";
 import { supabase } from "@/lib/supabaseClient";
+import { getDiscoveryExcludedUserIds } from "@/lib/likes";
 
 const avatars = [p1, p2, p3, p4];
 const locations = ["Rishikesh", "Bangalore", "Pune", "Varanasi", "Mumbai", "Dharamshala"];
@@ -22,6 +23,8 @@ export type UserProfile = {
   onboarding_completed: boolean;
   is_blocked: boolean;
   chat_disabled: boolean;
+  diet: string | null;
+  lifestyle: string | null;
   created_at: string;
 };
 
@@ -80,6 +83,8 @@ const toUserProfile = (row: Partial<UserProfile>): UserProfile => ({
   onboarding_completed: row.onboarding_completed === true,
   is_blocked: row.is_blocked === true,
   chat_disabled: row.chat_disabled === true,
+  diet: row.diet ?? null,
+  lifestyle: row.lifestyle ?? null,
   created_at: row.created_at ?? new Date().toISOString(),
 });
 
@@ -173,7 +178,9 @@ export const getCurrentUserProfile = async (): Promise<UserProfile | null> => {
 
   const { data, error } = await supabase
     .from("users")
-    .select("id,email,full_name,gender,seeking_gender,age,city,guru,practices,bio,avatar_url,onboarding_completed,is_blocked,chat_disabled,created_at")
+    .select(
+      "id,email,full_name,gender,seeking_gender,age,city,guru,practices,bio,avatar_url,onboarding_completed,is_blocked,chat_disabled,diet,lifestyle,created_at"
+    )
     .eq("id", user.id)
     .maybeSingle();
 
@@ -192,7 +199,9 @@ export const getAllProfilesExceptMe = async (): Promise<UserProfileWithCompatibi
 
   const { data, error } = await supabase
     .from("users")
-    .select("id,email,full_name,gender,seeking_gender,age,city,guru,practices,bio,avatar_url,onboarding_completed,is_blocked,chat_disabled,created_at")
+    .select(
+      "id,email,full_name,gender,seeking_gender,age,city,guru,practices,bio,avatar_url,onboarding_completed,is_blocked,chat_disabled,diet,lifestyle,created_at"
+    )
     .neq("id", me.id)
     .eq("is_blocked", false)
     .order("created_at", { ascending: false });
@@ -208,6 +217,19 @@ export const getAllProfilesExceptMe = async (): Promise<UserProfileWithCompatibi
       compatibility: calculateCompatibility(me, profile),
     };
   });
+};
+
+/** Swipe / “Suggested” carousels: hide passed users and anyone in an active match or pending request. */
+export const getDiscoverySuggestionsExceptRelations = async (): Promise<UserProfileWithCompatibility[]> => {
+  const all = await getAllProfilesExceptMe();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return [];
+  }
+  const excluded = await getDiscoveryExcludedUserIds(user.id);
+  return all.filter((p) => !excluded.has(p.id));
 };
 
 export const getChats = async (): Promise<ChatListItem[]> => {
@@ -235,7 +257,9 @@ export const getChats = async (): Promise<ChatListItem[]> => {
   const [{ data: otherUsers }, { data: messageRows }] = await Promise.all([
     supabase
       .from("users")
-      .select("id,email,full_name,gender,seeking_gender,age,city,guru,practices,bio,avatar_url,onboarding_completed,is_blocked,chat_disabled,created_at")
+      .select(
+        "id,email,full_name,gender,seeking_gender,age,city,guru,practices,bio,avatar_url,onboarding_completed,is_blocked,chat_disabled,diet,lifestyle,created_at"
+      )
       .in("id", otherIds),
     supabase
       .from("messages")

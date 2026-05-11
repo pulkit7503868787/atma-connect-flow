@@ -28,3 +28,21 @@ export const practices = [
   { id: "journaling", label: "Journaling" },
   { id: "scripture", label: "Scripture Study" },
 ];
+
+export const dietOptions = [
+  { id: "sattvic", label: "Sattvic" },
+  { id: "vegan", label: "Vegan" },
+  { id: "vegetarian", label: "Vegetarian" },
+  { id: "lacto_vegetarian", label: "Lacto-vegetarian" },
+  { id: "flexitarian", label: "Flexitarian" },
+];
+
+export const lifestyleOptions = [
+  { id: "ashram_stay", label: "Ashram-stay" },
+  { id: "householder", label: "Householder" },
+  { id: "vanaprastha", label: "Vanaprastha" },
+  { id: "traveling_seeker", label: "Traveling seeker" },
+];
+
+export const optionLabel = (options: { id: string; label: string }[], id: string | null | undefined) =>
+  options.find((x) => x.id === id)?.label ?? "—";

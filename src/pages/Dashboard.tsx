@@ -3,7 +3,7 @@ import { Bell, Sparkles, Flame, Calendar } from "lucide-react";
 import mandala from "@/assets/mandala-bg.jpg";
 import { useEffect, useMemo, useState } from "react";
 import {
-  getAllProfilesExceptMe,
+  getDiscoverySuggestionsExceptRelations,
   getCurrentUserProfile,
   getDisplayName,
   getProfileAge,
@@ -41,7 +41,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     const load = async () => {
-      const [myProfile, data] = await Promise.all([getCurrentUserProfile(), getAllProfilesExceptMe()]);
+      const [myProfile, data] = await Promise.all([getCurrentUserProfile(), getDiscoverySuggestionsExceptRelations()]);
       setMe(myProfile);
       setMatches(data);
 

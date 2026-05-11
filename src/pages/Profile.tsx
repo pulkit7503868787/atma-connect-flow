@@ -23,9 +23,10 @@ import { checkMutualMatch, hasUserLiked, likeUser, rejectIncomingRequest } from 
 import { signOutUser } from "@/lib/auth";
 import { updateUserProfile } from "@/lib/profile";
 import { uploadProfileImage } from "@/lib/profileStorage";
-import { gurus, practices as practiceOptions } from "@/lib/onboardingOptions";
+import { dietOptions, gurus, lifestyleOptions, optionLabel, practices as practiceOptions } from "@/lib/onboardingOptions";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabaseClient";
 
 const practiceLabel = (id: string) => practiceOptions.find((p) => p.id === id)?.label ?? id;
 
@@ -51,6 +52,8 @@ const Profile = () => {
   const [editCity, setEditCity] = useState("");
   const [editBio, setEditBio] = useState("");
   const [editGuru, setEditGuru] = useState("");
+  const [editDiet, setEditDiet] = useState("");
+  const [editLifestyle, setEditLifestyle] = useState("");
   const [editPractices, setEditPractices] = useState<string[]>([]);
   const [savingProfile, setSavingProfile] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -76,6 +79,8 @@ const Profile = () => {
     setEditCity(me.city ?? "");
     setEditBio(me.bio ?? "");
     setEditGuru(me.guru ?? "");
+    setEditDiet(me.diet ?? "");
+    setEditLifestyle(me.lifestyle ?? "");
     setEditPractices([...me.practices]);
   }, [me, isOwn]);
 
@@ -101,6 +106,8 @@ const Profile = () => {
       compatibility,
       guru: guruDisplayName(otherProfile.guru),
       practice: practiceLabel(getPrimaryPractice(otherProfile.practices)),
+      diet: optionLabel(dietOptions, otherProfile.diet),
+      lifestyle: optionLabel(lifestyleOptions, otherProfile.lifestyle),
       bio: otherProfile.bio ?? "Walking the path of bhakti, breath, and being.",
       practices: otherProfile.practices.length ? otherProfile.practices : ["Daily Sadhana"],
       guruId: otherProfile.guru,
@@ -181,6 +188,8 @@ const Profile = () => {
       city: editCity.trim() || null,
       bio: editBio.trim() || null,
       guru: editGuru || null,
+      diet: editDiet || null,
+      lifestyle: editLifestyle || null,
       practices: editPractices,
     });
     setSavingProfile(false);
@@ -269,23 +278,29 @@ const Profile = () => {
   };
 
   const handleReport = async () => {
-    if (!me?.id || !id) return;
-    const { setUserBlocked } = await import("@/lib/admin");
-    const { data: existing } = await import("@/lib/supabaseClient").then((m) =>
-      m.supabase.from("reports").select("id").eq("reporter_id", me.id).eq("reported_id", id).maybeSingle()
-    );
-    if (existing.data) {
+    if (!me?.id || !id) {
+      return;
+    }
+    const { data: existing, error: existingErr } = await supabase
+      .from("reports")
+      .select("id")
+      .eq("reporter_id", me.id)
+      .eq("reported_id", id)
+      .maybeSingle();
+    if (existingErr) {
+      toast.error(existingErr.message ?? "Could not verify report status.");
+      return;
+    }
+    if (existing) {
       toast.error("You have already reported this user.");
       return;
     }
-    const { error } = await import("@/lib/supabaseClient").then((m) =>
-      m.supabase.from("reports").insert({
-        reporter_id: me.id,
-        reported_id: id,
-        reason: "Inappropriate behaviour",
-        status: "pending",
-      })
-    );
+    const { error } = await supabase.from("reports").insert({
+      reporter_id: me.id,
+      reported_id: id,
+      reason: "Inappropriate behaviour",
+      status: "pending",
+    });
     if (error) {
       toast.error(error.message ?? "Could not report user.");
       return;
@@ -409,8 +424,36 @@ const Profile = () => {
                   </select>
                 </div>
                 <Field label="Practice" value={practiceLabel(getPrimaryPractice(editPractices))} />
-                <Field label="Diet" value="Sattvic" />
-                <Field label="Lifestyle" value="Ashram-stay" />
+                <div className="space-y-2">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Diet</p>
+                  <select
+                    value={editDiet}
+                    onChange={(e) => setEditDiet(e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-border/60 bg-card px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="">Choose diet</option>
+                    {dietOptions.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Lifestyle</p>
+                  <select
+                    value={editLifestyle}
+                    onChange={(e) => setEditLifestyle(e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-border/60 bg-card px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="">Choose lifestyle</option>
+                    {lifestyleOptions.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-3">Daily practices</p>
@@ -491,8 +534,8 @@ const Profile = () => {
               <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
                 <Field label="Guru" value={profile.guru} />
                 <Field label="Practice" value={profile.practice} />
-                <Field label="Diet" value="Sattvic" />
-                <Field label="Lifestyle" value="Ashram-stay" />
+                <Field label="Diet" value={profile.diet} />
+                <Field label="Lifestyle" value={profile.lifestyle} />
               </div>
 
               <div className="mt-6">
@@ -519,6 +562,15 @@ const Profile = () => {
               <Button onClick={() => void handleOpenChat()} className="mt-6 w-full h-12 bg-gradient-saffron text-primary-foreground shadow-warm">
                 <MessageCircle className="h-4 w-4 mr-2" /> Open Chat
               </Button>
+            ) : isReceivedRequest ? (
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <Button onClick={() => void handleReject()} variant="outline" className="h-12 border-border/60 bg-card">
+                  Reject
+                </Button>
+                <Button onClick={() => void handleConnect()} className="h-12 bg-gradient-saffron text-primary-foreground shadow-warm">
+                  Accept
+                </Button>
+              </div>
             ) : (
               <div className="mt-6 grid grid-cols-2 gap-3">
                 <Button onClick={() => void handleReject()} variant="outline" className="h-12 border-border/60 bg-card">

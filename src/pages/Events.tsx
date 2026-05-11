@@ -42,9 +42,13 @@ const Events = () => {
     void loadEvents(filter);
   }, [filter]);
 
-  const handleRsvp = async (eventId: string) => {
+  const handleRsvp = async (eventId: string, maxAttendees: number) => {
     const isGoing = myRsvps[eventId] === "going";
     const nextStatus = isGoing ? "cancelled" : "going";
+    if (!isGoing && nextStatus === "going" && (rsvpCounts[eventId] ?? 0) >= maxAttendees) {
+      toast.error("This gathering is at capacity.");
+      return;
+    }
     setRsvpLoading(eventId);
     const result = await rsvpToEvent(eventId, nextStatus);
     setRsvpLoading(null);
@@ -52,11 +56,9 @@ const Events = () => {
       toast.error(result.error ?? "Could not update RSVP.");
       return;
     }
+    const freshCount = await getRsvpCount(eventId);
     setMyRsvps((prev) => ({ ...prev, [eventId]: nextStatus }));
-    setRsvpCounts((prev) => ({
-      ...prev,
-      [eventId]: isGoing ? Math.max(0, (prev[eventId] ?? 0) - 1) : (prev[eventId] ?? 0) + 1,
-    }));
+    setRsvpCounts((prev) => ({ ...prev, [eventId]: freshCount }));
     toast.success(isGoing ? "RSVP cancelled." : "You're going!");
   };
 
@@ -105,7 +107,7 @@ const Events = () => {
                   <span className="flex items-center gap-1"><Users className="h-3 w-3" /> {rsvpCounts[e.id] ?? 0} / {e.max_attendees}</span>
                 </div>
                 <Button
-                  onClick={() => void handleRsvp(e.id)}
+                  onClick={() => void handleRsvp(e.id, e.max_attendees)}
                   disabled={rsvpLoading === e.id}
                   className={`w-full mt-4 h-11 transition-all ${
                     myRsvps[e.id] === "going"

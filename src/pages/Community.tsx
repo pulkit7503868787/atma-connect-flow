@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Heart, MessageCircle, Share2, Plus, X, Image as ImageIcon, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { getPosts, createPost, toggleLikePost, getPostComments, addComment, type Post, type PostComment } from "@/lib/posts";
+import { uploadCommunityPostImage } from "@/lib/postStorage";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -14,6 +15,9 @@ const Community = () => {
   const [composing, setComposing] = useState(false);
   const [text, setText] = useState("");
   const [sharing, setSharing] = useState(false);
+  const [composeImage, setComposeImage] = useState<File | null>(null);
+  const [composeImagePreview, setComposeImagePreview] = useState<string | null>(null);
+  const composeImageInputRef = useRef<HTMLInputElement>(null);
 
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
   const [comments, setComments] = useState<PostComment[]>([]);
@@ -34,13 +38,50 @@ const Community = () => {
     setLoading(false);
   };
 
+  const clearComposeImage = () => {
+    if (composeImagePreview) {
+      URL.revokeObjectURL(composeImagePreview);
+    }
+    setComposeImage(null);
+    setComposeImagePreview(null);
+  };
+
+  const handleComposeImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) {
+      return;
+    }
+    clearComposeImage();
+    setComposeImage(file);
+    setComposeImagePreview(URL.createObjectURL(file));
+  };
+
   const handleShare = async () => {
-    if (!text.trim()) {
-      toast.error("Write something before sharing.");
+    if (!text.trim() && !composeImage) {
+      toast.error("Write something or add an image before sharing.");
       return;
     }
     setSharing(true);
-    const result = await createPost(text.trim());
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    let imageUrl: string | null = null;
+    if (composeImage) {
+      if (!user) {
+        setSharing(false);
+        toast.error("Please sign in to share images.");
+        return;
+      }
+      const uploaded = await uploadCommunityPostImage(user.id, composeImage);
+      if (uploaded.error || !uploaded.publicUrl) {
+        setSharing(false);
+        toast.error(uploaded.error ?? "Could not upload image.");
+        return;
+      }
+      imageUrl = uploaded.publicUrl;
+    }
+    const result = await createPost(text.trim(), imageUrl);
     setSharing(false);
     if (!result.ok || !result.post) {
       toast.error(result.error ?? "Could not share post.");
@@ -48,6 +89,7 @@ const Community = () => {
     }
     setPosts((prev) => [result.post!, ...prev]);
     setText("");
+    clearComposeImage();
     setComposing(false);
     toast.success("Shared with sangha!");
   };
@@ -135,6 +177,9 @@ const Community = () => {
                 <p className="text-xs text-muted-foreground">{timeAgo(p.created_at)}</p>
               </div>
             </div>
+            {p.image_url && (
+              <img src={p.image_url} alt="" loading="lazy" className="mt-4 w-full max-h-72 rounded-xl object-cover" />
+            )}
             <p className="mt-4 text-[15px] leading-relaxed">{p.content}</p>
             <div className="mt-4 flex gap-6 text-sm text-muted-foreground">
               <button
@@ -164,9 +209,25 @@ const Community = () => {
       {composing && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center animate-fade-in">
           <div className="w-full max-w-md bg-card rounded-t-3xl sm:rounded-3xl p-6 shadow-warm animate-slide-up">
+            <input
+              ref={composeImageInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="sr-only"
+              tabIndex={-1}
+              onChange={(e) => void handleComposeImageChange(e)}
+            />
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-serif text-2xl">Share with sangha</h3>
-              <button onClick={() => { setComposing(false); setText(""); }} className="h-8 w-8 rounded-full bg-secondary grid place-items-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setComposing(false);
+                  setText("");
+                  clearComposeImage();
+                }}
+                className="h-8 w-8 rounded-full bg-secondary grid place-items-center"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -176,13 +237,22 @@ const Community = () => {
               placeholder="What is alive in you today?"
               className="min-h-[140px] bg-background border-border/60 resize-none"
             />
+            {composeImagePreview && (
+              <div className="mt-3 relative rounded-xl overflow-hidden border border-border/60">
+                <img src={composeImagePreview} alt="" className="w-full max-h-48 object-cover" />
+              </div>
+            )}
             <div className="flex items-center justify-between mt-4">
-              <button className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary">
+              <button
+                type="button"
+                onClick={() => composeImageInputRef.current?.click()}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary"
+              >
                 <ImageIcon className="h-4 w-4" /> Add image
               </button>
               <Button
                 onClick={() => void handleShare()}
-                disabled={sharing || !text.trim()}
+                disabled={sharing || (!text.trim() && !composeImage)}
                 className="bg-gradient-saffron text-primary-foreground shadow-warm"
               >
                 {sharing ? "Sharing..." : "Share"}

@@ -1,20 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
-import { Heart, X, Star, MapPin, Sparkles, MessageCircle } from "lucide-react";
+import { Heart, X, Star, MapPin, Sparkles, MessageCircle, Check } from "lucide-react";
 import {
   getDisplayName,
   getCurrentUserProfile,
   getProfileAge,
   getProfileCity,
   getProfilePhotoUrl,
-  getAllProfilesExceptMe,
+  getDiscoverySuggestionsExceptRelations,
   type UserProfile,
   type UserProfileWithCompatibility,
 } from "@/lib/db";
-import { getConfirmedMatchesForUser, type RankedMatch, type MatchingUser } from "@/lib/matching";
-import { acceptIncomingRequest, getReceivedRequests, getSentRequests, rejectIncomingRequest, passUser, superLikeUser } from "@/lib/likes";
-import { getPassedUserIds } from "@/lib/passes";
+import { type RankedMatch, type MatchingUser } from "@/lib/matching";
+import { acceptIncomingRequest, getMatches, getReceivedRequests, getSentRequests, rejectIncomingRequest, passUser, superLikeUser } from "@/lib/likes";
 import { createOrGetChat } from "@/lib/chat";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -28,6 +27,7 @@ const Matches = () => {
   const [suggested, setSuggested] = useState<UserProfileWithCompatibility[]>([]);
   const [incoming, setIncoming] = useState<MatchingUser[]>([]);
   const [outgoing, setOutgoing] = useState<MatchingUser[]>([]);
+  const [confirmedMatches, setConfirmedMatches] = useState<MatchingUser[]>([]);
   const [me, setMe] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [idx, setIdx] = useState(0);
@@ -39,16 +39,19 @@ const Matches = () => {
       setIncoming([]);
       setOutgoing([]);
       setSuggested([]);
+      setConfirmedMatches([]);
       return;
     }
-    const [received, sent, allOthers] = await Promise.all([
+    const [received, sent, allOthers, confirmed] = await Promise.all([
       getReceivedRequests(currentUser.id),
       getSentRequests(currentUser.id),
-      getAllProfilesExceptMe(),
+      getDiscoverySuggestionsExceptRelations(),
+      getMatches(currentUser.id),
     ]);
     setIncoming(received.users);
     setOutgoing(sent);
     setSuggested(allOthers);
+    setConfirmedMatches(confirmed);
   }, []);
 
   useEffect(() => {
@@ -69,14 +72,14 @@ const Matches = () => {
         return;
       }
 
-      const [data, passedIds] = await Promise.all([
-        getAllProfilesExceptMe(),
-        getPassedUserIds(currentUser.id),
+      const [data, confirmed] = await Promise.all([
+        getDiscoverySuggestionsExceptRelations(),
+        getMatches(currentUser.id),
       ]);
 
-      const filtered = data
-        .filter((p) => !passedIds.has(p.id))
-        .map((p) => ({
+      setConfirmedMatches(confirmed);
+
+      const filtered = data.map((p) => ({
           ...p,
           compatibility: p.compatibility,
           finalCompatibilityScore: p.compatibility,
@@ -277,10 +280,10 @@ const Matches = () => {
                     className="h-12 border-border/60 bg-card"
                     onClick={() => void handleRejectIncoming(u.id)}
                   >
-                    <Heart className="h-4 w-4 mr-2 text-primary" /> Bless
+                    Reject
                   </Button>
                   <Button type="button" className="h-12 bg-gradient-saffron text-primary-foreground shadow-warm" onClick={() => void handleAccept(u.id)}>
-                    <MessageCircle className="h-4 w-4 mr-2" /> Connect
+                    <Check className="h-4 w-4 mr-2" /> Accept
                   </Button>
                 </div>
               </div>
@@ -301,19 +304,22 @@ const Matches = () => {
           )}
           {!loading &&
             outgoing.map((u) => (
-              <Link key={u.id} to={`/app/profile/${u.id}`} className="glass-card rounded-2xl p-5 shadow-card flex items-center gap-3">
-                <img
-                  src={getProfilePhotoUrl(u)}
-                  alt={getDisplayName(u)}
-                  className="h-14 w-14 rounded-full object-cover shrink-0"
-                />
-                <div className="min-w-0 text-left">
-                  <p className="font-medium truncate">{getDisplayName(u)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {getProfileAge(u)}, {getProfileCity(u)}
-                  </p>
-                </div>
-              </Link>
+              <div key={u.id} className="glass-card rounded-2xl p-5 shadow-card flex flex-col gap-3">
+                <Link to={`/app/profile/${u.id}`} className="flex items-center gap-3">
+                  <img
+                    src={getProfilePhotoUrl(u)}
+                    alt={getDisplayName(u)}
+                    className="h-14 w-14 rounded-full object-cover shrink-0"
+                  />
+                  <div className="min-w-0 text-left">
+                    <p className="font-medium truncate">{getDisplayName(u)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {getProfileAge(u)}, {getProfileCity(u)}
+                    </p>
+                  </div>
+                </Link>
+                <p className="text-xs text-muted-foreground">Awaiting their response</p>
+              </div>
             ))}
         </div>
       </div>
@@ -361,6 +367,38 @@ const Matches = () => {
   return (
     <div className="animate-fade-in">
       <PageHeader title="Matches" subtitle="Souls that resonate with yours" />
+
+      <div className="px-5 pb-6 space-y-4">
+        {!loading && confirmedMatches.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Sacred connections</p>
+            {confirmedMatches.map((u) => (
+              <div key={u.id} className="glass-card rounded-2xl p-5 shadow-card flex flex-col gap-3">
+                <Link to={`/app/profile/${u.id}`} className="flex items-center gap-3">
+                  <img
+                    src={getProfilePhotoUrl(u)}
+                    alt={getDisplayName(u)}
+                    className="h-14 w-14 rounded-full object-cover shrink-0"
+                  />
+                  <div className="min-w-0 text-left">
+                    <p className="font-medium truncate">{getDisplayName(u)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {getProfileAge(u)}, {getProfileCity(u)}
+                    </p>
+                  </div>
+                </Link>
+                <Button
+                  type="button"
+                  className="h-12 w-full bg-gradient-saffron text-primary-foreground shadow-warm"
+                  onClick={() => void openChatWithMatch(u.id)}
+                >
+                  <MessageCircle className="h-4 w-4 mr-2" /> Open Chat
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="px-5 relative">
         {loading && <p className="text-center text-sm text-muted-foreground py-24">Loading matches...</p>}

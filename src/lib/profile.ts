@@ -11,6 +11,8 @@ export type ProfileUpdateInput = Partial<{
   practices: string[];
   avatar_url: string | null;
   onboarding_completed: boolean;
+  diet: string | null;
+  lifestyle: string | null;
 }>;
 
 /** Updates only columns present in `data`. Caller must be authenticated as `userId`. */
