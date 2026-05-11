@@ -1,6 +1,7 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { createNotification } from "@/lib/notifications";
+import type { ChatAttachmentKind } from "@/lib/chatAttachmentStorage";
 
 export type DbMessage = {
   id: string;
@@ -8,6 +9,14 @@ export type DbMessage = {
   sender_id: string;
   content: string;
   created_at: string;
+  attachment_url?: string | null;
+  attachment_type?: string | null;
+};
+
+export type SendMessageInput = {
+  content: string;
+  attachment_url?: string | null;
+  attachment_type?: ChatAttachmentKind | null;
 };
 
 export type CreateOrGetChatResult = {
@@ -54,9 +63,23 @@ export type SendMessageResult =
   | { ok: true; message: DbMessage }
   | { ok: false };
 
-export const sendMessage = async (chat_id: string, sender_id: string, content: string): Promise<SendMessageResult> => {
-  const body = content.trim();
-  if (!chat_id || !sender_id || !body) {
+const MESSAGE_SELECT = "id,chat_id,sender_id,content,created_at,attachment_url,attachment_type";
+
+export const sendMessage = async (
+  chat_id: string,
+  sender_id: string,
+  input: string | SendMessageInput
+): Promise<SendMessageResult> => {
+  const normalized: SendMessageInput = typeof input === "string" ? { content: input } : input;
+
+  const body = normalized.content.trim();
+  const attUrl = normalized.attachment_url?.trim() || null;
+  const attType: ChatAttachmentKind | null = attUrl ? normalized.attachment_type ?? null : null;
+
+  if (!chat_id || !sender_id) {
+    return { ok: false };
+  }
+  if (!body && !attUrl) {
     return { ok: false };
   }
 
@@ -80,8 +103,10 @@ export const sendMessage = async (chat_id: string, sender_id: string, content: s
       chat_id,
       sender_id,
       content: body,
+      attachment_url: attUrl,
+      attachment_type: attType,
     })
-    .select("id,chat_id,sender_id,content,created_at")
+    .select(MESSAGE_SELECT)
     .single();
 
   if (error || !inserted) {
@@ -90,17 +115,9 @@ export const sendMessage = async (chat_id: string, sender_id: string, content: s
 
   const row = inserted as DbMessage;
 
-  const { data: chatRow } = await supabase
-    .from("chats")
-    .select("user1_id,user2_id")
-    .eq("id", chat_id)
-    .maybeSingle();
+  const { data: chatRow } = await supabase.from("chats").select("user1_id,user2_id").eq("id", chat_id).maybeSingle();
 
-  const receiverId = chatRow
-    ? chatRow.user1_id === sender_id
-      ? chatRow.user2_id
-      : chatRow.user1_id
-    : null;
+  const receiverId = chatRow ? (chatRow.user1_id === sender_id ? chatRow.user2_id : chatRow.user1_id) : null;
 
   if (receiverId) {
     await createNotification(receiverId, "message", chat_id);
@@ -110,11 +127,7 @@ export const sendMessage = async (chat_id: string, sender_id: string, content: s
 };
 
 export const getMessages = async (chat_id: string): Promise<DbMessage[]> => {
-  const { data, error } = await supabase
-    .from("messages")
-    .select("id,chat_id,sender_id,content,created_at")
-    .eq("chat_id", chat_id)
-    .order("created_at", { ascending: true });
+  const { data, error } = await supabase.from("messages").select(MESSAGE_SELECT).eq("chat_id", chat_id).order("created_at", { ascending: true });
 
   if (error || !data) {
     return [];

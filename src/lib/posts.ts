@@ -2,11 +2,37 @@ import { supabase } from "@/lib/supabaseClient";
 import { getDisplayName, getProfilePhotoUrl, type UserProfile } from "@/lib/db";
 import { getCommunityPostImagePublicUrl } from "@/lib/postStorage";
 
+export type PostCategory =
+  | "reflection"
+  | "satsang"
+  | "event"
+  | "chanting"
+  | "meditation_audio"
+  | "teaching";
+
+export const POST_CATEGORY_LABELS: Record<PostCategory, string> = {
+  reflection: "Reflection",
+  satsang: "Satsang invitation",
+  event: "Spiritual gathering",
+  chanting: "Chanting",
+  meditation_audio: "Meditation audio",
+  teaching: "Sacred teaching",
+};
+
 export type Post = {
   id: string;
   user_id: string;
   content: string;
+  category: PostCategory;
   image_url: string | null;
+  image_urls: string[];
+  audio_url: string | null;
+  video_url: string | null;
+  event_title: string | null;
+  event_starts_at: string | null;
+  event_location: string | null;
+  event_link: string | null;
+  cover_image_url: string | null;
   likes_count: number;
   comments_count: number;
   created_at: string;
@@ -25,8 +51,65 @@ export type PostComment = {
   author_avatar: string;
 };
 
-const enrichPosts = async (rows: { id: string; user_id: string; content: string; image_url: string | null; likes_count: number; comments_count: number; created_at: string }[], currentUserId?: string): Promise<Post[]> => {
-  if (!rows.length) return [];
+type PostRow = {
+  id: string;
+  user_id: string;
+  content: string;
+  image_url: string | null;
+  category?: string | null;
+  image_urls?: unknown;
+  audio_url?: string | null;
+  video_url?: string | null;
+  event_title?: string | null;
+  event_starts_at?: string | null;
+  event_location?: string | null;
+  event_link?: string | null;
+  cover_image_url?: string | null;
+  likes_count: number;
+  comments_count: number;
+  created_at: string;
+};
+
+const resolveStoredUrl = (raw: string | null | undefined): string | null => {
+  const s = raw?.trim();
+  if (!s) {
+    return null;
+  }
+  return s.startsWith("http") ? s : getCommunityPostImagePublicUrl(s);
+};
+
+const parseCategory = (v: string | null | undefined): PostCategory => {
+  const allowed: PostCategory[] = [
+    "reflection",
+    "satsang",
+    "event",
+    "chanting",
+    "meditation_audio",
+    "teaching",
+  ];
+  if (v && allowed.includes(v as PostCategory)) {
+    return v as PostCategory;
+  }
+  return "reflection";
+};
+
+const mergeImageUrls = (row: PostRow): string[] => {
+  const raw = row.image_urls;
+  const fromJson = Array.isArray(raw) ? raw.filter((x): x is string => typeof x === "string" && x.trim().length > 0) : [];
+  const legacy = row.image_url?.trim();
+  if (!legacy) {
+    return fromJson;
+  }
+  if (!fromJson.length) {
+    return [legacy];
+  }
+  return fromJson.includes(legacy) ? fromJson : [legacy, ...fromJson];
+};
+
+const enrichPosts = async (rows: PostRow[], currentUserId?: string): Promise<Post[]> => {
+  if (!rows.length) {
+    return [];
+  }
 
   const userIds = [...new Set(rows.map((r) => r.user_id))];
   const { data: users } = await supabase
@@ -38,23 +121,35 @@ const enrichPosts = async (rows: { id: string; user_id: string; content: string;
 
   let likedPostIds = new Set<string>();
   if (currentUserId) {
-    const { data: myLikes } = await supabase
-      .from("post_likes")
-      .select("post_id")
-      .eq("user_id", currentUserId);
+    const { data: myLikes } = await supabase.from("post_likes").select("post_id").eq("user_id", currentUserId);
     likedPostIds = new Set((myLikes ?? []).map((l) => l.post_id));
   }
 
   return rows.map((row) => {
     const u = userMap.get(row.user_id);
-    const imageUrl = row.image_url?.trim()
-      ? row.image_url.trim().startsWith("http")
-        ? row.image_url.trim()
-        : getCommunityPostImagePublicUrl(row.image_url.trim())
-      : null;
+    const mergedPaths = mergeImageUrls(row);
+    const image_urls = mergedPaths.map((p) => resolveStoredUrl(p) ?? "").filter(Boolean);
+    const primaryLegacy = row.image_url?.trim()
+      ? resolveStoredUrl(row.image_url.trim())
+      : image_urls[0] ?? null;
+
     return {
-      ...row,
-      image_url: imageUrl,
+      id: row.id,
+      user_id: row.user_id,
+      content: row.content,
+      category: parseCategory(row.category),
+      image_url: primaryLegacy,
+      image_urls: image_urls.length ? image_urls : primaryLegacy ? [primaryLegacy] : [],
+      audio_url: resolveStoredUrl(row.audio_url),
+      video_url: resolveStoredUrl(row.video_url),
+      event_title: row.event_title?.trim() || null,
+      event_starts_at: row.event_starts_at ?? null,
+      event_location: row.event_location?.trim() || null,
+      event_link: row.event_link?.trim() || null,
+      cover_image_url: resolveStoredUrl(row.cover_image_url),
+      likes_count: row.likes_count,
+      comments_count: row.comments_count,
+      created_at: row.created_at,
       author_name: u ? getDisplayName(u as UserProfile) : "Seeker",
       author_avatar: u ? getProfilePhotoUrl(u as unknown as Pick<UserProfile, "id" | "avatar_url">) : "",
       liked_by_me: likedPostIds.has(row.id),
@@ -62,38 +157,80 @@ const enrichPosts = async (rows: { id: string; user_id: string; content: string;
   });
 };
 
-export const getPosts = async (currentUserId?: string): Promise<Post[]> => {
-  const { data, error } = await supabase
-    .from("posts")
-    .select("id,user_id,content,image_url,likes_count,comments_count,created_at")
-    .order("created_at", { ascending: false })
-    .limit(50);
+const POST_SELECT =
+  "id,user_id,content,image_url,category,image_urls,audio_url,video_url,event_title,event_starts_at,event_location,event_link,cover_image_url,likes_count,comments_count,created_at";
 
-  if (error || !data) return [];
-  return enrichPosts(data, currentUserId);
+export const getPosts = async (currentUserId?: string): Promise<Post[]> => {
+  const { data, error } = await supabase.from("posts").select(POST_SELECT).order("created_at", { ascending: false }).limit(50);
+
+  if (error || !data) {
+    return [];
+  }
+  return enrichPosts(data as PostRow[], currentUserId);
 };
 
-export const createPost = async (content: string, imageUrl?: string | null): Promise<{ ok: boolean; post?: Post; error?: string | null }> => {
+export type CreatePostPayload = {
+  content: string;
+  category: PostCategory;
+  imagePaths: string[];
+  audioPath?: string | null;
+  videoPath?: string | null;
+  eventTitle?: string | null;
+  eventStartsAt?: string | null;
+  eventLocation?: string | null;
+  eventLink?: string | null;
+  coverImagePath?: string | null;
+};
+
+export const createPost = async (payload: CreatePostPayload): Promise<{ ok: boolean; post?: Post; error?: string | null }> => {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Unauthorized" };
-
-  const trimmed = content.trim();
-  const body = trimmed || (imageUrl ? "Shared with the sangha." : "");
-  if (!body && !imageUrl) {
-    return { ok: false, error: "Write something or add an image." };
+  if (!user) {
+    return { ok: false, error: "Unauthorized" };
   }
 
-  const { data, error } = await supabase
-    .from("posts")
-    .insert({ user_id: user.id, content: body, image_url: imageUrl ?? null })
-    .select("id,user_id,content,image_url,likes_count,comments_count,created_at")
-    .single();
+  const trimmed = payload.content.trim();
+  const paths = payload.imagePaths.filter(Boolean);
+  const firstPath = paths[0] ?? null;
+  const hasMedia = Boolean(
+    firstPath || paths.length || payload.audioPath || payload.videoPath || payload.coverImagePath
+  );
+  const hasEvent = Boolean(payload.eventTitle?.trim() && payload.eventStartsAt);
 
-  if (error || !data) return { ok: false, error: error?.message ?? "Failed to create post" };
+  let body = trimmed;
+  if (!body && hasEvent) {
+    body = payload.eventTitle?.trim() ?? "Sacred gathering";
+  }
+  if (!body && hasMedia) {
+    body = "Shared with the sangha.";
+  }
+  if (!body) {
+    return { ok: false, error: "Write something or add media." };
+  }
 
-  const enriched = await enrichPosts([data], user.id);
+  const insertRow: Record<string, unknown> = {
+    user_id: user.id,
+    content: body,
+    category: payload.category,
+    image_url: firstPath,
+    image_urls: paths.length ? paths : firstPath ? [firstPath] : [],
+    audio_url: payload.audioPath ?? null,
+    video_url: payload.videoPath ?? null,
+    event_title: payload.eventTitle?.trim() || null,
+    event_starts_at: payload.eventStartsAt || null,
+    event_location: payload.eventLocation?.trim() || null,
+    event_link: payload.eventLink?.trim() || null,
+    cover_image_url: payload.coverImagePath ?? null,
+  };
+
+  const { data, error } = await supabase.from("posts").insert(insertRow).select(POST_SELECT).single();
+
+  if (error || !data) {
+    return { ok: false, error: error?.message ?? "Failed to create post" };
+  }
+
+  const enriched = await enrichPosts([data as PostRow], user.id);
   return { ok: true, post: enriched[0] };
 };
 
@@ -101,26 +238,43 @@ export const toggleLikePost = async (postId: string): Promise<{ ok: boolean; lik
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { ok: false, liked: false, error: "Unauthorized" };
+  if (!user) {
+    return { ok: false, liked: false, error: "Unauthorized" };
+  }
 
-  const { data: existing } = await supabase
-    .from("post_likes")
-    .select("id")
-    .eq("post_id", postId)
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const { data: existing } = await supabase.from("post_likes").select("id").eq("post_id", postId).eq("user_id", user.id).maybeSingle();
 
   if (existing) {
-    await supabase.from("post_likes").delete().eq("id", existing.id);
-    await supabase.rpc("decrement_post_likes", { post_id: postId });
+    const { error: delErr } = await supabase.from("post_likes").delete().eq("id", existing.id);
+    if (delErr) {
+      return { ok: false, liked: true, error: delErr.message };
+    }
     return { ok: true, liked: false };
   }
 
   const { error } = await supabase.from("post_likes").insert({ post_id: postId, user_id: user.id });
-  if (error) return { ok: false, liked: false, error: error.message };
+  if (error) {
+    return { ok: false, liked: false, error: error.message };
+  }
 
-  await supabase.rpc("increment_post_likes", { post_id: postId });
   return { ok: true, liked: true };
+};
+
+/** Refresh counts from server after like (triggers maintain posts.likes_count). */
+export const getPostLikeSnapshot = async (
+  postId: string,
+  currentUserId?: string
+): Promise<{ likes_count: number; liked_by_me: boolean } | null> => {
+  const { data: row, error } = await supabase.from("posts").select("likes_count").eq("id", postId).maybeSingle();
+  if (error || !row) {
+    return null;
+  }
+  let liked = false;
+  if (currentUserId) {
+    const { data: lk } = await supabase.from("post_likes").select("id").eq("post_id", postId).eq("user_id", currentUserId).maybeSingle();
+    liked = Boolean(lk);
+  }
+  return { likes_count: row.likes_count, liked_by_me: liked };
 };
 
 export const getPostComments = async (postId: string): Promise<PostComment[]> => {
@@ -130,13 +284,12 @@ export const getPostComments = async (postId: string): Promise<PostComment[]> =>
     .eq("post_id", postId)
     .order("created_at", { ascending: true });
 
-  if (error || !data) return [];
+  if (error || !data) {
+    return [];
+  }
 
   const userIds = [...new Set(data.map((r) => r.user_id))];
-  const { data: users } = await supabase
-    .from("users")
-    .select("id,email,full_name,avatar_url")
-    .in("id", userIds);
+  const { data: users } = await supabase.from("users").select("id,email,full_name,avatar_url").in("id", userIds);
 
   const userMap = new Map((users ?? []).map((u) => [u.id, u]));
 
@@ -150,11 +303,16 @@ export const getPostComments = async (postId: string): Promise<PostComment[]> =>
   });
 };
 
-export const addComment = async (postId: string, content: string): Promise<{ ok: boolean; comment?: PostComment; error?: string | null }> => {
+export const addComment = async (
+  postId: string,
+  content: string
+): Promise<{ ok: boolean; comment?: PostComment; comments_count?: number; error?: string | null }> => {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Unauthorized" };
+  if (!user) {
+    return { ok: false, error: "Unauthorized" };
+  }
 
   const { data, error } = await supabase
     .from("post_comments")
@@ -162,16 +320,22 @@ export const addComment = async (postId: string, content: string): Promise<{ ok:
     .select("id,post_id,user_id,content,created_at")
     .single();
 
-  if (error || !data) return { ok: false, error: error?.message ?? "Failed to add comment" };
+  if (error || !data) {
+    return { ok: false, error: error?.message ?? "Failed to add comment" };
+  }
 
-  await supabase.rpc("increment_post_comments", { post_id: postId });
+  const [{ data: u }, { data: postRow }] = await Promise.all([
+    supabase.from("users").select("id,email,full_name,avatar_url").eq("id", user.id).maybeSingle(),
+    supabase.from("posts").select("comments_count").eq("id", postId).maybeSingle(),
+  ]);
 
   return {
     ok: true,
+    comments_count: postRow?.comments_count,
     comment: {
       ...data,
-      author_name: "You",
-      author_avatar: "",
+      author_name: u ? getDisplayName(u as UserProfile) : "Seeker",
+      author_avatar: u ? getProfilePhotoUrl(u as unknown as Pick<UserProfile, "id" | "avatar_url">) : "",
     },
   };
 };

@@ -93,6 +93,8 @@ export type ChatMessage = {
   sender_id: string;
   content: string;
   created_at: string;
+  attachment_url?: string | null;
+  attachment_type?: string | null;
 };
 
 const parseAge = (value: unknown): number | null => {
@@ -373,7 +375,7 @@ export const getChats = async (): Promise<ChatListItem[]> => {
     supabase.from("users").select(USERS_PROFILE_SELECT_PUBLIC).in("id", otherIds),
     supabase
       .from("messages")
-      .select("id,chat_id,sender_id,content,created_at")
+      .select("id,chat_id,sender_id,content,created_at,attachment_url,attachment_type")
       .in("chat_id", chatIds)
       .order("created_at", { ascending: false }),
   ]);
@@ -399,12 +401,21 @@ export const getChats = async (): Promise<ChatListItem[]> => {
       const lastMessage = latestMessageByChat.get(chat.id);
       const dateSource = lastMessage?.created_at ?? chat.created_at;
 
+      const lastPreview =
+        lastMessage?.content?.trim() ||
+        (lastMessage?.attachment_url
+          ? lastMessage.attachment_type === "image"
+            ? "Shared an image"
+            : "Shared a document"
+          : null) ||
+        "Start your sacred dialogue";
+
       return {
         ...chat,
         otherUserId,
         name: otherUser ? getDisplayName(otherUser) : "Seeker",
         avatar: otherUser ? getProfilePhotoUrl(otherUser) : getAvatarForId(otherUserId),
-        last: lastMessage?.content ?? "Start your sacred dialogue",
+        last: lastPreview,
         time: new Date(dateSource).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         unread: 0,
       };
@@ -433,7 +444,7 @@ export const getMessages = async (chatId: string): Promise<ChatMessage[]> => {
 
   const { data, error } = await supabase
     .from("messages")
-    .select("id,chat_id,sender_id,content,created_at")
+    .select("id,chat_id,sender_id,content,created_at,attachment_url,attachment_type")
     .eq("chat_id", chatId)
     .order("created_at", { ascending: true });
 
