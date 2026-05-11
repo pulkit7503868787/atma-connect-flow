@@ -186,9 +186,9 @@ const Dashboard = () => {
       {/* Stats */}
       <section className="px-5 mt-6 grid grid-cols-3 gap-3">
         {[
-          { icon: Sparkles, label: "Matches", value: String(confirmedCount), tint: "bg-primary/10 text-primary", to: "/app/matches" },
-          { icon: Flame, label: "Sent", value: String(sentCount), tint: "bg-accent/20 text-accent", to: "/app/matches?view=sent" },
-          { icon: Calendar, label: "Received", value: String(receivedCount), tint: "bg-secondary text-foreground", to: "/app/matches?view=received" },
+          { icon: Sparkles, label: "Matches", value: String(confirmedCount), tint: "bg-primary/10 text-primary", to: "/app/matches#sacred-connections" },
+          { icon: Flame, label: "Sent", value: String(sentCount), tint: "bg-accent/20 text-accent", to: "/app/matches#sent-invitations" },
+          { icon: Calendar, label: "Received", value: String(receivedCount), tint: "bg-secondary text-foreground", to: "/app/matches#soul-requests" },
         ].map((s) => (
           <Link to={s.to} key={s.label} className="glass-card rounded-2xl p-4 text-center hover:shadow-warm transition-all">
             <div className={`h-9 w-9 rounded-xl mx-auto grid place-items-center ${s.tint}`}>
@@ -203,25 +203,23 @@ const Dashboard = () => {
       {/* Suggested matches */}
       <section className="px-5 mt-8">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-serif text-2xl">Suggested for you</h2>
-          <Link to="/app/matches?view=suggestions" className="text-sm text-primary font-medium">
-            See all →
+          <h2 className="font-serif text-2xl">Discovery</h2>
+          <Link to="/app/matches#discovery" className="text-sm text-primary font-medium">
+            Open journey →
           </Link>
         </div>
-        <div className="flex gap-4 overflow-x-auto -mx-5 px-5 pb-4 snap-x snap-mandatory scrollbar-none">
+        <div className="space-y-3">
+          {suggested.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No souls in your discovery circle yet.</p>}
           {suggested.map((m) => (
-            <Link key={m.id} to={`/app/profile/${m.id}`} className="snap-start shrink-0 w-44 group">
-              <div className="relative aspect-[3/4] rounded-2xl overflow-hidden shadow-card">
-                <img src={m.photo} alt={m.name} loading="lazy" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent" />
-                <span className="absolute top-3 right-3 px-2 py-1 rounded-full bg-background/90 backdrop-blur text-xs font-semibold text-primary">
-                  {m.compatibility}%
-                </span>
-                <div className="absolute bottom-0 inset-x-0 p-3 text-ivory">
-                  <p className="font-serif text-lg leading-none">{m.name}, {m.age}</p>
-                  <p className="text-xs opacity-90 mt-1">{m.location}</p>
-                </div>
+            <Link key={m.id} to={`/app/profile/${m.id}`} className="glass-card rounded-2xl p-4 shadow-card flex items-center gap-4">
+              <img src={m.photo} alt={m.name} loading="lazy" className="h-16 w-16 rounded-xl object-cover shrink-0" />
+              <div className="min-w-0 flex-1 text-left">
+                <p className="font-medium truncate">
+                  {m.name}, {m.age}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">{m.location}</p>
               </div>
+              <span className="text-xs font-semibold text-primary shrink-0">{m.compatibility}%</span>
             </Link>
           ))}
         </div>

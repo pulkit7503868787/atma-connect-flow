@@ -2,8 +2,18 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
-import { gurus, meditationTypes, practices } from "@/lib/onboardingOptions";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ArrowLeft, ArrowRight, Check, ChevronDown } from "lucide-react";
+import {
+  gurus,
+  marriageTimelines,
+  meditationTypes,
+  optionLabel,
+  practices,
+  sadhanaFrequencies,
+  spiritualPaths,
+  type GuruEntry,
+} from "@/lib/onboardingOptions";
 import { cn } from "@/lib/utils";
 import { updateUserProfile } from "@/lib/profile";
 import { supabase } from "@/lib/supabaseClient";
@@ -11,6 +21,72 @@ import { toast } from "sonner";
 import { getCurrentUserProfile, isProfileComplete } from "@/lib/db";
 
 const TOTAL = 5;
+
+const deriveSpiritualPath = (medIds: string[]): string | null => {
+  if (medIds.includes("kriya")) {
+    return "kriya";
+  }
+  if (medIds.includes("bhakti")) {
+    return "bhakti";
+  }
+  if (medIds.includes("mindfulness") || medIds.includes("vipassana")) {
+    return "mindfulness";
+  }
+  if (medIds.includes("mantra")) {
+    return "bhakti";
+  }
+  if (medIds.includes("silence")) {
+    return "advaita";
+  }
+  return medIds.length ? "integral" : null;
+};
+
+const deriveMeditationExperience = (medIds: string[]): string | null => {
+  if (medIds.length >= 5) {
+    return "deep";
+  }
+  if (medIds.length >= 3) {
+    return "steady";
+  }
+  if (medIds.length >= 1) {
+    return "beginner";
+  }
+  return null;
+};
+
+const deriveSadhanaFromPractices = (pracIds: string[]): string => {
+  if (pracIds.length >= 5) {
+    return "daily_twice";
+  }
+  if (pracIds.length >= 2) {
+    return "daily_once";
+  }
+  return "most_days";
+};
+
+const GuruDetailCard = ({ g }: { g: GuruEntry }) => (
+  <div className="glass-card rounded-2xl p-4 mt-6 text-left space-y-3 animate-fade-in">
+    <div className="flex gap-4 items-start">
+      {g.imageUrl ? (
+        <img
+          src={g.imageUrl}
+          alt=""
+          className="h-16 w-16 rounded-full object-cover shrink-0 border border-border/50"
+        />
+      ) : (
+        <div className="h-16 w-16 rounded-full bg-primary/10 border border-border/50 shrink-0 grid place-items-center text-lg text-primary font-serif">
+          ॐ
+        </div>
+      )}
+      <div className="min-w-0 space-y-1">
+        <p className="font-serif text-xl leading-tight">{g.name}</p>
+        <p className="text-xs text-muted-foreground">{g.tradition}</p>
+        {g.lineage ? <p className="text-xs text-foreground/80 leading-snug">{g.lineage}</p> : null}
+        {g.bio ? <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{g.bio}</p> : null}
+      </div>
+    </div>
+  </div>
+);
 
 const Onboarding = () => {
   const nav = useNavigate();
@@ -20,9 +96,15 @@ const Onboarding = () => {
   const [guru, setGuru] = useState<string>("");
   const [med, setMed] = useState<string[]>([]);
   const [prac, setPrac] = useState<string[]>([]);
+  const [optionalMarriage, setOptionalMarriage] = useState("");
+  const [optionalSadhana, setOptionalSadhana] = useState("");
+  const [optionalRefineOpen, setOptionalRefineOpen] = useState(false);
 
   const toggle = (arr: string[], setArr: (v: string[]) => void, id: string) =>
     setArr(arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
+
+  const selectedGuru = guru ? gurus.find((x) => x.id === guru) : undefined;
+  const previewSpiritualPath = deriveSpiritualPath(med) ?? "integral";
 
   useEffect(() => {
     let mounted = true;
@@ -31,6 +113,23 @@ const Onboarding = () => {
       const profile = await getCurrentUserProfile();
       if (mounted && isProfileComplete(profile)) {
         nav("/app", { replace: true });
+      }
+      if (mounted && profile && !isProfileComplete(profile)) {
+        if (profile.full_name?.trim()) {
+          setName(profile.full_name.trim());
+        }
+        if (profile.guru?.trim()) {
+          setGuru(profile.guru.trim());
+        }
+        if (profile.practices?.length) {
+          setPrac(profile.practices);
+        }
+        if (profile.marriage_timeline?.trim()) {
+          setOptionalMarriage(profile.marriage_timeline.trim());
+        }
+        if (profile.sadhana_frequency?.trim()) {
+          setOptionalSadhana(profile.sadhana_frequency.trim());
+        }
       }
     };
 
@@ -73,7 +172,11 @@ const Onboarding = () => {
       existingProfile?.bio?.trim() ||
       "On a spiritual journey seeking a conscious connection.";
     const derivedGuru = guru || existingProfile?.guru || gurus[0]?.id || "spiritual_path";
-    const selectedPractices = prac.length > 0 ? prac : ["daily_sadhana"];
+    const selectedPractices = prac.length > 0 ? prac : ["yoga"];
+    const spiritualPath = deriveSpiritualPath(med) ?? existingProfile?.spiritual_path ?? "integral";
+    const sadhanaFrequency =
+      optionalSadhana.trim() || deriveSadhanaFromPractices(selectedPractices);
+    const marriageTimeline = optionalMarriage.trim() || "when_ready";
 
     const result = await updateUserProfile(user.id, {
       full_name: name.trim() || null,
@@ -84,6 +187,13 @@ const Onboarding = () => {
       bio: derivedBio,
       guru: derivedGuru,
       practices: selectedPractices,
+      spiritual_path: spiritualPath,
+      sadhana_frequency: sadhanaFrequency,
+      marriage_timeline: marriageTimeline,
+      meditation_experience: deriveMeditationExperience(med),
+      seva_inclination: selectedPractices.includes("seva") ? "daily_small" : null,
+      programs_undergone: existingProfile?.programs_undergone?.length ? existingProfile.programs_undergone : [],
+      spiritual_values: existingProfile?.spiritual_values?.length ? existingProfile.spiritual_values : [],
       onboarding_completed: true,
     });
 
@@ -171,12 +281,7 @@ const Onboarding = () => {
                 </div>
               </div>
             </div>
-            {guru && (
-              <div className="text-center animate-fade-in">
-                <p className="font-serif text-2xl">{gurus.find((g) => g.id === guru)?.name}</p>
-                <p className="text-sm text-muted-foreground">{gurus.find((g) => g.id === guru)?.tradition}</p>
-              </div>
-            )}
+            {selectedGuru ? <GuruDetailCard g={selectedGuru} /> : null}
           </div>
         )}
 
@@ -230,11 +335,74 @@ const Onboarding = () => {
             <h2 className="font-serif text-4xl mt-6">Welcome, {name || "seeker"}</h2>
             <p className="text-muted-foreground mt-3 max-w-xs mx-auto">Your sacred profile is ready. May this journey lead you to a soul that mirrors your own.</p>
             <div className="glass-card rounded-2xl p-5 mt-8 text-left space-y-2">
-              {guru && <Row label="Guru" value={gurus.find(g => g.id === guru)?.name || ""} />}
+              {guru && <Row label="Guru" value={gurus.find((g) => g.id === guru)?.name || ""} />}
+              <Row label="Path" value={optionLabel(spiritualPaths, previewSpiritualPath)} />
               <Row label="Meditation" value={`${med.length} selected`} />
               <Row label="Practices" value={`${prac.length} selected`} />
               <Row label="Seeking" value={intent || "—"} />
+              <Row
+                label="Marriage intention"
+                value={optionalMarriage ? optionLabel(marriageTimelines, optionalMarriage) : "When the soul is ready (default)"}
+              />
+              <Row
+                label="Sadhana rhythm"
+                value={
+                  optionalSadhana ? optionLabel(sadhanaFrequencies, optionalSadhana) : "Gentle default from your practices"
+                }
+              />
             </div>
+
+            <Collapsible open={optionalRefineOpen} onOpenChange={setOptionalRefineOpen} className="mt-6 text-left">
+              <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-2xl border border-border/50 bg-card/60 px-4 py-3 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <span>Optional — refine intention & rhythm</span>
+                <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", optionalRefineOpen && "rotate-180")} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-5 pt-4 px-0.5">
+                <p className="text-xs text-muted-foreground">You can always deepen this later in your profile.</p>
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Marriage timeline</p>
+                  <div className="flex flex-wrap gap-2">
+                    {marriageTimelines.map((m) => {
+                      const sel = optionalMarriage === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setOptionalMarriage(sel ? "" : m.id)}
+                          className={cn(
+                            "px-3 py-2 rounded-full border text-xs font-medium transition-all",
+                            sel ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border/60 hover:border-primary/40"
+                          )}
+                        >
+                          {m.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Sadhana frequency</p>
+                  <div className="flex flex-wrap gap-2">
+                    {sadhanaFrequencies.map((s) => {
+                      const sel = optionalSadhana === s.id;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setOptionalSadhana(sel ? "" : s.id)}
+                          className={cn(
+                            "px-3 py-2 rounded-full border text-xs font-medium transition-all",
+                            sel ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border/60 hover:border-primary/40"
+                          )}
+                        >
+                          {s.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
         )}
       </main>

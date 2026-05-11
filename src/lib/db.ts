@@ -3,10 +3,22 @@ import p2 from "@/assets/profile-2.jpg";
 import p3 from "@/assets/profile-3.jpg";
 import p4 from "@/assets/profile-4.jpg";
 import { supabase } from "@/lib/supabaseClient";
-import { getDiscoveryExcludedUserIds } from "@/lib/likes";
+import { getDiscoveryExcludedUserIds } from "@/lib/discoveryExclude";
+import { computeBlendedCompatibilityScore, computeBlendedWithReasons, type CompatibilityInput } from "@/lib/compatibility";
 
 const avatars = [p1, p2, p3, p4];
 const locations = ["Rishikesh", "Bangalore", "Pune", "Varanasi", "Mumbai", "Dharamshala"];
+
+/** Columns safe to load for discovery / lists (excludes contact until mutual match RPC). */
+export const USERS_PROFILE_SELECT_PUBLIC =
+  "id,email,full_name,gender,seeking_gender,age,city,guru,practices,bio,avatar_url,onboarding_completed,is_blocked,chat_disabled,diet,lifestyle,created_at," +
+  "spiritual_path,programs_undergone,sadhana_frequency,spiritual_values,meditation_experience,seva_inclination,guru_notes,guru_photo_url," +
+  "marriage_timeline,marital_status,children_preference,relocation_openness,family_orientation," +
+  "languages,smoking_habit,drinking_habit,daily_rhythm," +
+  "religion,caste,nakshatra,gothram," +
+  "occupation,education,income_range,height_cm,family_details,verification_status";
+
+export const USERS_PROFILE_SELECT_SELF = `${USERS_PROFILE_SELECT_PUBLIC},whatsapp_number,call_preference`;
 
 export type UserProfile = {
   id: string;
@@ -26,10 +38,40 @@ export type UserProfile = {
   diet: string | null;
   lifestyle: string | null;
   created_at: string;
+  spiritual_path: string | null;
+  programs_undergone: string[];
+  sadhana_frequency: string | null;
+  spiritual_values: string[];
+  meditation_experience: string | null;
+  seva_inclination: string | null;
+  guru_notes: string | null;
+  guru_photo_url: string | null;
+  marriage_timeline: string | null;
+  marital_status: string | null;
+  children_preference: string | null;
+  relocation_openness: string | null;
+  family_orientation: string | null;
+  languages: string[];
+  smoking_habit: string | null;
+  drinking_habit: string | null;
+  daily_rhythm: string | null;
+  religion: string | null;
+  caste: string | null;
+  nakshatra: string | null;
+  gothram: string | null;
+  occupation: string | null;
+  education: string | null;
+  income_range: string | null;
+  height_cm: number | null;
+  family_details: string | null;
+  verification_status: "unverified" | "pending" | "verified";
+  whatsapp_number: string | null;
+  call_preference: string | null;
 };
 
 export type UserProfileWithCompatibility = UserProfile & {
   compatibility: number;
+  match_reasons?: string[];
 };
 
 export type ChatListItem = {
@@ -68,7 +110,27 @@ const parseAge = (value: unknown): number | null => {
   return rounded;
 };
 
-const toUserProfile = (row: Partial<UserProfile>): UserProfile => ({
+const strArr = (v: unknown): string[] => (Array.isArray(v) ? (v as string[]).map(String).filter(Boolean) : []);
+
+const parseHeight = (v: unknown): number | null => {
+  if (v === null || v === undefined) {
+    return null;
+  }
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 100 || n > 250) {
+    return null;
+  }
+  return Math.round(n);
+};
+
+const verStatus = (v: unknown): UserProfile["verification_status"] => {
+  if (v === "pending" || v === "verified") {
+    return v;
+  }
+  return "unverified";
+};
+
+const toUserProfile = (row: Partial<UserProfile> & Record<string, unknown>): UserProfile => ({
   id: row.id ?? "",
   email: row.email ?? "",
   full_name: row.full_name ?? null,
@@ -86,7 +148,38 @@ const toUserProfile = (row: Partial<UserProfile>): UserProfile => ({
   diet: row.diet ?? null,
   lifestyle: row.lifestyle ?? null,
   created_at: row.created_at ?? new Date().toISOString(),
+  spiritual_path: row.spiritual_path != null ? String(row.spiritual_path) : null,
+  programs_undergone: strArr(row.programs_undergone),
+  sadhana_frequency: row.sadhana_frequency != null ? String(row.sadhana_frequency) : null,
+  spiritual_values: strArr(row.spiritual_values),
+  meditation_experience: row.meditation_experience != null ? String(row.meditation_experience) : null,
+  seva_inclination: row.seva_inclination != null ? String(row.seva_inclination) : null,
+  guru_notes: row.guru_notes != null ? String(row.guru_notes) : null,
+  guru_photo_url: row.guru_photo_url != null ? String(row.guru_photo_url) : null,
+  marriage_timeline: row.marriage_timeline != null ? String(row.marriage_timeline) : null,
+  marital_status: row.marital_status != null ? String(row.marital_status) : null,
+  children_preference: row.children_preference != null ? String(row.children_preference) : null,
+  relocation_openness: row.relocation_openness != null ? String(row.relocation_openness) : null,
+  family_orientation: row.family_orientation != null ? String(row.family_orientation) : null,
+  languages: strArr(row.languages),
+  smoking_habit: row.smoking_habit != null ? String(row.smoking_habit) : null,
+  drinking_habit: row.drinking_habit != null ? String(row.drinking_habit) : null,
+  daily_rhythm: row.daily_rhythm != null ? String(row.daily_rhythm) : null,
+  religion: row.religion != null ? String(row.religion) : null,
+  caste: row.caste != null ? String(row.caste) : null,
+  nakshatra: row.nakshatra != null ? String(row.nakshatra) : null,
+  gothram: row.gothram != null ? String(row.gothram) : null,
+  occupation: row.occupation != null ? String(row.occupation) : null,
+  education: row.education != null ? String(row.education) : null,
+  income_range: row.income_range != null ? String(row.income_range) : null,
+  height_cm: parseHeight(row.height_cm),
+  family_details: row.family_details != null ? String(row.family_details) : null,
+  verification_status: verStatus(row.verification_status),
+  whatsapp_number: row.whatsapp_number != null ? String(row.whatsapp_number) : null,
+  call_preference: row.call_preference != null ? String(row.call_preference) : null,
 });
+
+export { toUserProfile as mapSupabaseUserRow };
 
 const hasText = (value: string | null | undefined) => Boolean(value && value.trim().length > 0);
 
@@ -152,20 +245,11 @@ export const getDisplayName = (profile: Pick<UserProfile, "full_name" | "email">
 export const getPrimaryPractice = (practices: string[]) =>
   practices.length ? practices[0] : "Daily Sadhana";
 
-export const calculateCompatibility = (
-  me: Pick<UserProfile, "guru" | "practices">,
-  other: Pick<UserProfile, "guru" | "practices">
-) => {
-  let score = 0;
-  if (me.guru && other.guru && me.guru === other.guru) {
-    score += 50;
-  }
+export const calculateCompatibility = (me: UserProfile, other: UserProfile) =>
+  computeBlendedCompatibilityScore(me as CompatibilityInput, other as CompatibilityInput);
 
-  const commonPractices = me.practices.filter((p) => other.practices.includes(p));
-  score += commonPractices.length * 10;
-
-  return Math.max(0, Math.min(100, score));
-};
+export const getCompatibilityWithReasons = (me: UserProfile, other: UserProfile) =>
+  computeBlendedWithReasons(me as CompatibilityInput, other as CompatibilityInput);
 
 export const getCurrentUserProfile = async (): Promise<UserProfile | null> => {
   const {
@@ -176,13 +260,7 @@ export const getCurrentUserProfile = async (): Promise<UserProfile | null> => {
     return null;
   }
 
-  const { data, error } = await supabase
-    .from("users")
-    .select(
-      "id,email,full_name,gender,seeking_gender,age,city,guru,practices,bio,avatar_url,onboarding_completed,is_blocked,chat_disabled,diet,lifestyle,created_at"
-    )
-    .eq("id", user.id)
-    .maybeSingle();
+  const { data, error } = await supabase.from("users").select(USERS_PROFILE_SELECT_SELF).eq("id", user.id).maybeSingle();
 
   if (error || !data) {
     return null;
@@ -199,9 +277,7 @@ export const getAllProfilesExceptMe = async (): Promise<UserProfileWithCompatibi
 
   const { data, error } = await supabase
     .from("users")
-    .select(
-      "id,email,full_name,gender,seeking_gender,age,city,guru,practices,bio,avatar_url,onboarding_completed,is_blocked,chat_disabled,diet,lifestyle,created_at"
-    )
+    .select(USERS_PROFILE_SELECT_PUBLIC)
     .neq("id", me.id)
     .eq("is_blocked", false)
     .order("created_at", { ascending: false });
@@ -212,11 +288,27 @@ export const getAllProfilesExceptMe = async (): Promise<UserProfileWithCompatibi
 
   return data.map((row) => {
     const profile = toUserProfile(row);
+    const blended = computeBlendedWithReasons(me as CompatibilityInput, profile as CompatibilityInput);
     return {
       ...profile,
-      compatibility: calculateCompatibility(me, profile),
+      compatibility: blended.score,
+      match_reasons: blended.reasons,
     };
   });
+};
+
+export const fetchMatchedContactFields = async (
+  otherUserId: string
+): Promise<{ whatsapp: string | null; callPreference: string | null }> => {
+  const { data, error } = await supabase.rpc("get_matched_contact_fields", { p_other: otherUserId });
+  if (error || !data || typeof data !== "object") {
+    return { whatsapp: null, callPreference: null };
+  }
+  const o = data as { whatsapp_number?: string | null; call_preference?: string | null };
+  return {
+    whatsapp: o.whatsapp_number?.trim() || null,
+    callPreference: o.call_preference?.trim() || null,
+  };
 };
 
 /** Swipe / “Suggested” carousels: hide passed users and anyone in an active match or pending request. */
@@ -255,12 +347,7 @@ export const getChats = async (): Promise<ChatListItem[]> => {
   const chatIds = chatRows.map((chat) => chat.id);
 
   const [{ data: otherUsers }, { data: messageRows }] = await Promise.all([
-    supabase
-      .from("users")
-      .select(
-        "id,email,full_name,gender,seeking_gender,age,city,guru,practices,bio,avatar_url,onboarding_completed,is_blocked,chat_disabled,diet,lifestyle,created_at"
-      )
-      .in("id", otherIds),
+    supabase.from("users").select(USERS_PROFILE_SELECT_PUBLIC).in("id", otherIds),
     supabase
       .from("messages")
       .select("id,chat_id,sender_id,content,created_at")

@@ -1,19 +1,10 @@
+import type { UserProfile } from "@/lib/db";
 import { supabase } from "@/lib/supabaseClient";
 
-export type ProfileUpdateInput = Partial<{
-  full_name: string | null;
-  gender: string | null;
-  seeking_gender: string | null;
-  age: number | null;
-  city: string | null;
-  bio: string | null;
-  guru: string | null;
-  practices: string[];
-  avatar_url: string | null;
-  onboarding_completed: boolean;
-  diet: string | null;
-  lifestyle: string | null;
-}>;
+/** Self-service profile fields (excludes moderation / identity columns). */
+export type ProfileUpdateInput = Partial<
+  Omit<UserProfile, "id" | "email" | "is_blocked" | "created_at" | "verification_status" | "chat_disabled">
+>;
 
 /** Updates only columns present in `data`. Caller must be authenticated as `userId`. */
 export const updateUserProfile = async (

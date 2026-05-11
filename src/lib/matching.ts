@@ -1,22 +1,11 @@
 import { supabase } from "@/lib/supabaseClient";
-import { calculateAISpiritualCompatibility, computeFinalCompatibilityScore } from "@/lib/aiMatching";
+import { calculateAISpiritualCompatibility } from "@/lib/aiMatching";
+import { mapSupabaseUserRow, USERS_PROFILE_SELECT_PUBLIC, type UserProfile } from "@/lib/db";
+import { computeBlendedCompatibilityScore, computeBlendedWithReasons, computeStructuredCompatibility, type CompatibilityInput } from "@/lib/compatibility";
 
-export type MatchingUser = {
-  id: string;
-  email: string;
-  full_name: string | null;
-  age: number | null;
-  city: string | null;
-  guru: string | null;
-  practices: string[];
-  bio: string | null;
-  avatar_url: string | null;
-  is_blocked: boolean;
-  created_at: string;
-};
+export type MatchingUser = UserProfile;
 
 export type RankedMatch = MatchingUser & {
-  /** Final blended score (same as `finalCompatibilityScore`; used across UI). */
   compatibility: number;
   finalCompatibilityScore: number;
   baseCompatibility: number;
@@ -24,59 +13,29 @@ export type RankedMatch = MatchingUser & {
   matchReasons: string[];
 };
 
-const normalizeUser = (row: Partial<MatchingUser>): MatchingUser => ({
-  id: row.id ?? "",
-  email: row.email ?? "",
-  full_name: row.full_name ?? null,
-  age: row.age != null && Number.isFinite(Number(row.age)) ? Math.round(Number(row.age)) : null,
-  city: row.city ?? null,
-  guru: row.guru ?? null,
-  practices: Array.isArray(row.practices) ? row.practices : [],
-  bio: row.bio ?? null,
-  avatar_url: row.avatar_url ?? null,
-  is_blocked: row.is_blocked === true,
-  created_at: row.created_at ?? new Date().toISOString(),
-});
+export const normalizeMatchingUserRow = (row: Record<string, unknown>): MatchingUser => mapSupabaseUserRow(row);
 
-export const calculateCompatibility = (
-  userA: Pick<MatchingUser, "guru" | "practices">,
-  userB: Pick<MatchingUser, "guru" | "practices">
-) => {
-  let score = 0;
-
-  if (userA.guru && userB.guru && userA.guru === userB.guru) {
-    score += 50;
-  }
-
-  const commonCount = userA.practices.filter((practice) => userB.practices.includes(practice)).length;
-  score += commonCount * 10;
-
-  if (commonCount >= 3) {
-    score += 10;
-  }
-
-  return Math.min(score, 100);
-};
+export { computeBlendedCompatibilityScore as calculateCompatibility } from "@/lib/compatibility";
 
 const rankPair = (currentUser: MatchingUser, user: MatchingUser): RankedMatch => {
-  const baseCompatibility = calculateCompatibility(currentUser, user);
+  const structured = computeStructuredCompatibility(currentUser as CompatibilityInput, user as CompatibilityInput);
   const ai = calculateAISpiritualCompatibility(currentUser, user);
-  const finalCompatibilityScore = computeFinalCompatibilityScore(baseCompatibility, ai.aiScore);
+  const blended = computeBlendedWithReasons(currentUser as CompatibilityInput, user as CompatibilityInput);
 
   return {
     ...user,
-    compatibility: finalCompatibilityScore,
-    finalCompatibilityScore,
-    baseCompatibility,
+    compatibility: blended.score,
+    finalCompatibilityScore: blended.score,
+    baseCompatibility: structured.score,
     aiSpiritualScore: ai.aiScore,
-    matchReasons: ai.reasons,
+    matchReasons: blended.reasons,
   };
 };
 
 export const getMatchesForUser = async (currentUser: MatchingUser): Promise<RankedMatch[]> => {
   const { data, error } = await supabase
     .from("users")
-    .select("id,email,full_name,age,city,guru,practices,bio,avatar_url,is_blocked,created_at")
+    .select(USERS_PROFILE_SELECT_PUBLIC)
     .neq("id", currentUser.id)
     .eq("is_blocked", false);
 
@@ -86,7 +45,7 @@ export const getMatchesForUser = async (currentUser: MatchingUser): Promise<Rank
 
   return data
     .map((row) => {
-      const user = normalizeUser(row);
+      const user = normalizeMatchingUserRow(row as Record<string, unknown>);
       return rankPair(currentUser, user);
     })
     .sort((a, b) => b.finalCompatibilityScore - a.finalCompatibilityScore);
@@ -115,14 +74,14 @@ export const getConfirmedMatchesForUser = async (currentUser: MatchingUser): Pro
 
   const { data: usersData, error: usersError } = await supabase
     .from("users")
-    .select("id,email,full_name,age,city,guru,practices,bio,avatar_url,is_blocked,created_at")
+    .select(USERS_PROFILE_SELECT_PUBLIC)
     .in("id", otherUserIds);
 
   if (usersError || !usersData) {
     return [];
   }
 
-  const usersById = new Map(usersData.map((row) => [row.id, normalizeUser(row)]));
+  const usersById = new Map(usersData.map((row) => [row.id, normalizeMatchingUserRow(row as Record<string, unknown>)]));
 
   return confirmedRows
     .map((row) => {

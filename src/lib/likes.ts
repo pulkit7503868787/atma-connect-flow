@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
+import { mapSupabaseUserRow, USERS_PROFILE_SELECT_PUBLIC } from "@/lib/db";
 import { calculateCompatibility, type MatchingUser } from "@/lib/matching";
 import { createNotification } from "@/lib/notifications";
 import { isPremium } from "@/lib/subscription";
@@ -15,19 +16,7 @@ export type LikeUserResult = {
   error?: string | null;
 };
 
-const normalizeUser = (row: Partial<MatchingUser>): MatchingUser => ({
-  id: row.id ?? "",
-  email: row.email ?? "",
-  full_name: row.full_name ?? null,
-  age: row.age != null && Number.isFinite(Number(row.age)) ? Math.round(Number(row.age)) : null,
-  city: row.city ?? null,
-  guru: row.guru ?? null,
-  practices: Array.isArray(row.practices) ? row.practices : [],
-  bio: row.bio ?? null,
-  avatar_url: row.avatar_url ?? null,
-  is_blocked: row.is_blocked === true,
-  created_at: row.created_at ?? new Date().toISOString(),
-});
+const normalizeUser = (row: Record<string, unknown>): MatchingUser => mapSupabaseUserRow(row);
 
 const orderedPair = (a: string, b: string) => (a < b ? { user1_id: a, user2_id: b } : { user1_id: b, user2_id: a });
 
@@ -118,7 +107,7 @@ export const getSentRequests = async (userId: string): Promise<MatchingUser[]> =
 
   const { data: usersRows, error: usersError } = await supabase
     .from("users")
-    .select("id,email,full_name,age,city,guru,practices,bio,avatar_url,is_blocked,created_at")
+    .select(USERS_PROFILE_SELECT_PUBLIC)
     .in("id", pendingIds)
     .eq("is_blocked", false);
 
@@ -170,7 +159,7 @@ export const getReceivedRequests = async (userId: string): Promise<ReceivedReque
 
   const { data: usersRows, error: usersError } = await supabase
     .from("users")
-    .select("id,email,full_name,age,city,guru,practices,bio,avatar_url,is_blocked,created_at")
+    .select(USERS_PROFILE_SELECT_PUBLIC)
     .in("id", pendingIds)
     .eq("is_blocked", false);
 
@@ -208,7 +197,7 @@ export const getMatches = async (userId: string): Promise<MatchingUser[]> => {
 
   const { data: usersRows, error: usersError } = await supabase
     .from("users")
-    .select("id,email,full_name,age,city,guru,practices,bio,avatar_url,is_blocked,created_at")
+    .select(USERS_PROFILE_SELECT_PUBLIC)
     .in("id", matchedIds)
     .eq("is_blocked", false);
 
@@ -222,7 +211,7 @@ export const getMatches = async (userId: string): Promise<MatchingUser[]> => {
 const pairCompatibilityScore = async (userA: string, userB: string): Promise<number> => {
   const { data: usersData } = await supabase
     .from("users")
-    .select("id,email,full_name,age,city,guru,practices,bio,avatar_url,is_blocked,created_at")
+    .select(USERS_PROFILE_SELECT_PUBLIC)
     .in("id", [userA, userB]);
 
   const liker = usersData?.find((u) => u.id === userA);
@@ -392,36 +381,10 @@ export const rejectIncomingRequest = async (
     return { ok: false, error: delError.message };
   }
 
+  // Treat reject like a pass so they move to "Passed souls" and stay out of Discovery.
+  await passUser(recipientId, senderId);
+
   return { ok: true, error: null };
-};
-
-/** Users to hide from swipe / suggested carousels: passed, matched, or any pending pair. */
-export const getDiscoveryExcludedUserIds = async (userId: string): Promise<Set<string>> => {
-  if (!(await isSameAuthUser(userId))) {
-    return new Set();
-  }
-
-  const [{ data: matchRows }, { data: passRows }] = await Promise.all([
-    supabase
-      .from("matches")
-      .select("user1_id,user2_id,status")
-      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`),
-    supabase.from("passes").select("passed_user_id").eq("user_id", userId),
-  ]);
-
-  const excluded = new Set<string>();
-  for (const r of passRows ?? []) {
-    if (r.passed_user_id) {
-      excluded.add(r.passed_user_id);
-    }
-  }
-  for (const row of matchRows ?? []) {
-    const other = row.user1_id === userId ? row.user2_id : row.user1_id;
-    if (row.status === "matched" || row.status === "pending") {
-      excluded.add(other);
-    }
-  }
-  return excluded;
 };
 
 /* ───── Pass / Skip tracking ───── */
@@ -455,6 +418,27 @@ export const getPassedUserIds = async (userId: string): Promise<Set<string>> => 
     return new Set();
   }
   return new Set(data.map((r) => r.passed_user_id));
+};
+
+/** Profiles the current user has passed (or declined); for the Passed souls hub section. */
+export const getPassedProfilesForUser = async (userId: string): Promise<MatchingUser[]> => {
+  if (!(await isSameAuthUser(userId))) {
+    return [];
+  }
+  const ids = Array.from(await getPassedUserIds(userId));
+  if (!ids.length) {
+    return [];
+  }
+  const { data: usersRows, error: usersError } = await supabase
+    .from("users")
+    .select(USERS_PROFILE_SELECT_PUBLIC)
+    .in("id", ids)
+    .eq("is_blocked", false);
+
+  if (usersError || !usersRows) {
+    return [];
+  }
+  return usersRows.map((row) => normalizeUser(row));
 };
 
 /* ───── Super Like ───── */
