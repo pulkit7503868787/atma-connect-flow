@@ -394,3 +394,101 @@ export const rejectIncomingRequest = async (
 
   return { ok: true, error: null };
 };
+
+/* ───── Pass / Skip tracking ───── */
+
+export const passUser = async (userId: string, passedId: string): Promise<{ ok: boolean; error: string | null }> => {
+  if (!userId || !passedId || userId === passedId) {
+    return { ok: false, error: "Invalid." };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || user.id !== userId) {
+    return { ok: false, error: "Unauthorized." };
+  }
+
+  const { error } = await supabase
+    .from("passes")
+    .upsert({ user_id: userId, passed_user_id: passedId }, { onConflict: "user_id,passed_user_id" });
+
+  return { ok: !error, error: error?.message ?? null };
+};
+
+export const getPassedUserIds = async (userId: string): Promise<Set<string>> => {
+  const { data, error } = await supabase
+    .from("passes")
+    .select("passed_user_id")
+    .eq("user_id", userId);
+
+  if (error || !data) {
+    return new Set();
+  }
+  return new Set(data.map((r) => r.passed_user_id));
+};
+
+/* ───── Super Like ───── */
+
+const FREE_DAILY_SUPER_LIMIT = 1;
+
+export type SuperLikeResult = {
+  ok: boolean;
+  mutualMatch: boolean;
+  error?: string | null;
+  reason?: "limit_reached" | "unauthorized" | null;
+};
+
+export const superLikeUser = async (liker_id: string, liked_id: string): Promise<SuperLikeResult> => {
+  const fail = (reason: SuperLikeResult["reason"], message?: string): SuperLikeResult => ({
+    ok: false,
+    mutualMatch: false,
+    reason: reason ?? null,
+    error: message ?? null,
+  });
+
+  if (!liker_id || !liked_id || liker_id === liked_id) {
+    return fail(null);
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || user.id !== liker_id) {
+    return fail("unauthorized");
+  }
+
+  const premium = await isPremium(liker_id);
+  if (!premium) {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const { count, error: countError } = await supabase
+      .from("super_likes")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", liker_id)
+      .gte("created_at", startOfDay.toISOString());
+
+    if (countError) {
+      return fail(null, countError.message);
+    }
+    if ((count ?? 0) >= FREE_DAILY_SUPER_LIMIT) {
+      return fail("limit_reached");
+    }
+  }
+
+  const { error: insertError } = await supabase
+    .from("super_likes")
+    .insert({ user_id: liker_id, liked_user_id: liked_id });
+
+  if (insertError) {
+    return fail(null, insertError.message);
+  }
+
+  const likeResult = await likeUser(liker_id, liked_id);
+  return {
+    ok: likeResult.ok,
+    mutualMatch: likeResult.mutualMatch,
+    error: likeResult.error,
+    reason: likeResult.reason ?? null,
+  };
+};

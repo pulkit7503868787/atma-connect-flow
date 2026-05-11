@@ -50,6 +50,14 @@ export const signInWithGoogle = async (): Promise<AuthResult> => {
   return { error: error?.message ?? null };
 };
 
+export const resetPassword = async (email: string): Promise<AuthResult> => {
+  const redirectTo = `${window.location.origin}/auth`;
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo,
+  });
+  return { error: error?.message ?? null };
+};
+
 export const upsertPublicUser = async (user: User | null): Promise<void> => {
   if (!user) {
     return;

@@ -13,7 +13,8 @@ import {
   type UserProfileWithCompatibility,
 } from "@/lib/db";
 import { getConfirmedMatchesForUser, type RankedMatch, type MatchingUser } from "@/lib/matching";
-import { acceptIncomingRequest, getReceivedRequests, getSentRequests, rejectIncomingRequest } from "@/lib/likes";
+import { acceptIncomingRequest, getReceivedRequests, getSentRequests, rejectIncomingRequest, passUser, superLikeUser } from "@/lib/likes";
+import { getPassedUserIds } from "@/lib/passes";
 import { createOrGetChat } from "@/lib/chat";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -68,8 +69,23 @@ const Matches = () => {
         return;
       }
 
-      const data = await getConfirmedMatchesForUser(currentUser);
-      setProfiles(data);
+      const [data, passedIds] = await Promise.all([
+        getAllProfilesExceptMe(),
+        getPassedUserIds(currentUser.id),
+      ]);
+
+      const filtered = data
+        .filter((p) => !passedIds.has(p.id))
+        .map((p) => ({
+          ...p,
+          compatibility: p.compatibility,
+          finalCompatibilityScore: p.compatibility,
+          baseCompatibility: p.compatibility,
+          aiSpiritualScore: 0,
+          matchReasons: [] as string[],
+        }));
+
+      setProfiles(filtered as RankedMatch[]);
       setLoading(false);
     };
 
@@ -146,6 +162,87 @@ const Matches = () => {
     }
     toast.success("Request ignored.");
     await reloadListViews();
+  };
+
+  const handlePass = async (passedId: string) => {
+    if (!me?.id) {
+      return;
+    }
+    const result = await passUser(me.id, passedId);
+    if (!result.ok) {
+      toast.error(result.error ?? "Could not pass.");
+      return;
+    }
+    advance();
+  };
+
+  const handleLike = async (likedId: string) => {
+    if (!me?.id) {
+      toast.error("Please sign in.");
+      return;
+    }
+    const { likeUser } = await import("@/lib/likes");
+    const result = await likeUser(me.id, likedId);
+    if (!result.ok) {
+      if (result.reason === "limit_reached") {
+        toast.error("Daily like limit reached. Upgrade to premium for unlimited likes.");
+        return;
+      }
+      if (result.reason === "blocked") {
+        toast.error("This profile is unavailable.");
+        return;
+      }
+      if (result.reason === "unauthorized") {
+        toast.error(result.error ?? "Please sign in again.");
+        return;
+      }
+      toast.error(result.error ?? "Unable to send request.");
+      return;
+    }
+    if (result.mutualMatch) {
+      toast.success("It's a match!");
+      const { chatId, error } = await createOrGetChat(me.id, likedId);
+      if (chatId) {
+        navigate(`/app/chat/${chatId}`);
+        return;
+      }
+      toast.error(error ?? "Matched but chat could not open.");
+      return;
+    }
+    toast.success("Request sent!");
+    advance();
+  };
+
+  const handleSuperLike = async (likedId: string) => {
+    if (!me?.id) {
+      toast.error("Please sign in.");
+      return;
+    }
+    const result = await superLikeUser(me.id, likedId);
+    if (!result.ok) {
+      if (result.reason === "limit_reached") {
+        toast.error("Daily super-like limit reached. Upgrade to Sacred for unlimited.");
+        return;
+      }
+      if (result.reason === "unauthorized") {
+        toast.error(result.error ?? "Please sign in again.");
+        return;
+      }
+      toast.error(result.error ?? "Could not send super-like.");
+      return;
+    }
+    if (result.mutualMatch) {
+      toast.success("Super match! They'll notice you.");
+      const { chatId, error } = await createOrGetChat(me.id, likedId);
+      if (chatId) {
+        navigate(`/app/chat/${chatId}`);
+        return;
+      }
+      toast.error(error ?? "Matched but chat could not open.");
+      return;
+    }
+    toast.success("Super-like sent! They'll notice you.");
+    advance();
   };
 
   if (view === "received") {
@@ -305,21 +402,21 @@ const Matches = () => {
         <div className="flex justify-center gap-5 mt-8">
           <button
             type="button"
-            onClick={advance}
+            onClick={() => m && void handlePass(m.id)}
             className="h-14 w-14 rounded-full bg-card border border-border shadow-soft grid place-items-center hover:scale-110 transition-transform"
           >
             <X className="h-6 w-6 text-muted-foreground" />
           </button>
           <button
             type="button"
-            onClick={() => m && void openChatWithMatch(m.id)}
+            onClick={() => m && void handleLike(m.id)}
             className="h-16 w-16 rounded-full bg-gradient-saffron shadow-warm grid place-items-center hover:scale-110 transition-transform"
           >
             <Heart className="h-7 w-7 text-primary-foreground" fill="currentColor" />
           </button>
           <button
             type="button"
-            onClick={advance}
+            onClick={() => m && void handleSuperLike(m.id)}
             className="h-14 w-14 rounded-full bg-card border border-border shadow-soft grid place-items-center hover:scale-110 transition-transform"
           >
             <Star className="h-6 w-6 text-accent" fill="currentColor" />

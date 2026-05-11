@@ -1,10 +1,11 @@
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Check, Lock, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { Check, Lock, Sparkles, Crown, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { startPremiumPayment } from "@/lib/payment";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabaseClient";
 
 const plans = [
   { id: "seeker", name: "Seeker", price: "Free", period: "", features: ["5 matches/day", "Community feed", "Basic profile"] },
@@ -15,10 +16,42 @@ const plans = [
 const Subscription = () => {
   const [selected, setSelected] = useState("sacred");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState<string | null>(null);
+  const [currentStatus, setCurrentStatus] = useState<string | null>(null);
+  const [loadingStatus, setLoadingStatus] = useState(true);
+
+  useEffect(() => {
+    const loadStatus = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        setLoadingStatus(false);
+        return;
+      }
+      const { data } = await supabase
+        .from("subscriptions")
+        .select("plan,status")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .maybeSingle();
+      if (data) {
+        setCurrentPlan(data.plan);
+        setCurrentStatus(data.status);
+        setSelected(data.plan === "premium" ? "sacred" : "seeker");
+      }
+      setLoadingStatus(false);
+    };
+    void loadStatus();
+  }, []);
 
   const handleUpgradeClick = async () => {
     if (selected === "seeker") {
-      toast.success("You are continuing with the free plan.");
+      if (currentPlan === "premium" && currentStatus === "active") {
+        toast("You will stay on free after your premium expires.");
+      } else {
+        toast.success("You are on the free plan.");
+      }
       return;
     }
 
@@ -38,6 +71,27 @@ const Subscription = () => {
     }
 
     toast.success("Premium subscription activated.");
+    setCurrentPlan("premium");
+    setCurrentStatus("active");
+  };
+
+  const handleCancel = async () => {
+    if (!confirm("Are you sure you want to cancel your premium subscription?")) return;
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    const { error } = await supabase
+      .from("subscriptions")
+      .update({ status: "cancelled", updated_at: new Date().toISOString() })
+      .eq("user_id", user.id)
+      .eq("status", "active");
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Subscription cancelled. You keep premium until the end of your billing period.");
+    setCurrentStatus("cancelled");
   };
 
   return (
@@ -45,6 +99,39 @@ const Subscription = () => {
       <PageHeader title="AatmamIlan Sacred" subtitle="Walk the path with full grace" back />
 
       <div className="px-5">
+        {/* Current Plan Status */}
+        {!loadingStatus && currentPlan === "premium" && currentStatus === "active" && (
+          <div className="glass-card rounded-2xl p-4 bg-gradient-saffron/10 border border-primary/30 mb-4 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Crown className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="font-medium text-sm">Sacred Premium Active</p>
+                  <p className="text-xs text-muted-foreground">Unlimited matches & full access</p>
+                </div>
+              </div>
+              <button
+                onClick={() => void handleCancel()}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
+              >
+                <X className="h-3 w-3" /> Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!loadingStatus && currentPlan === "premium" && currentStatus === "cancelled" && (
+          <div className="glass-card rounded-2xl p-4 bg-secondary/60 border border-border/60 mb-4 animate-fade-in">
+            <div className="flex items-center gap-2">
+              <Crown className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="font-medium text-sm">Premium Ending Soon</p>
+                <p className="text-xs text-muted-foreground">Your access continues until the billing period ends</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="glass-card rounded-2xl p-5 bg-gradient-dusk text-ivory mb-6 relative overflow-hidden">
           <Sparkles className="absolute -top-4 -right-4 h-32 w-32 text-primary-glow/20" />
           <p className="text-xs uppercase tracking-[0.3em] text-primary-glow">Premium</p>

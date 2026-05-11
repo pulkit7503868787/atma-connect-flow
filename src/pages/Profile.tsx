@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, MapPin, Sparkles, Heart, MessageCircle, Settings } from "lucide-react";
+import { ArrowLeft, MapPin, Sparkles, Heart, MessageCircle, Settings, Flag, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -268,6 +268,32 @@ const Profile = () => {
     toast.success("Bless sent.");
   };
 
+  const handleReport = async () => {
+    if (!me?.id || !id) return;
+    const { setUserBlocked } = await import("@/lib/admin");
+    const { data: existing } = await import("@/lib/supabaseClient").then((m) =>
+      m.supabase.from("reports").select("id").eq("reporter_id", me.id).eq("reported_id", id).maybeSingle()
+    );
+    if (existing.data) {
+      toast.error("You have already reported this user.");
+      return;
+    }
+    const { error } = await import("@/lib/supabaseClient").then((m) =>
+      m.supabase.from("reports").insert({
+        reporter_id: me.id,
+        reported_id: id,
+        reason: "Inappropriate behaviour",
+        status: "pending",
+      })
+    );
+    if (error) {
+      toast.error(error.message ?? "Could not report user.");
+      return;
+    }
+    toast.success("Report submitted. We'll review it.");
+    nav("/app/matches", { replace: true });
+  };
+
   const handleLogout = async () => {
     const result = await signOutUser();
     if (result.error) {
@@ -435,6 +461,13 @@ const Profile = () => {
             <Link to="/app/matches" className="absolute top-6 left-5 h-10 w-10 rounded-full bg-background/80 backdrop-blur grid place-items-center">
               <ArrowLeft className="h-4 w-4" />
             </Link>
+            <button
+              onClick={() => void handleReport()}
+              className="absolute top-6 right-5 h-10 w-10 rounded-full bg-background/80 backdrop-blur grid place-items-center"
+              title="Report user"
+            >
+              <Flag className="h-4 w-4" />
+            </button>
           </div>
 
           <div className="-mt-20 relative px-5">

@@ -166,7 +166,7 @@ const ChatRoom = ({ id }: { id: string }) => {
         <img src={c?.avatar} alt={c?.name} className="h-10 w-10 rounded-full object-cover" />
         <div>
           <p className="font-medium leading-none">{c?.name ?? "Conversation"}</p>
-          <p className="text-[11px] text-primary mt-1">● online</p>
+          <p className="text-[11px] text-muted-foreground mt-1">Tap to view profile</p>
         </div>
       </header>
 
