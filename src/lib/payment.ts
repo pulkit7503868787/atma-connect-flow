@@ -1,6 +1,9 @@
 import { supabase } from "@/lib/supabaseClient";
 
-const PREMIUM_AMOUNT_PAISE = 49900;
+const PLAN_AMOUNTS: Record<string, number> = {
+  sacred: 49900,   // ₹499
+  moksha: 149900,  // ₹1,499
+};
 
 const loadRazorpayScript = async () => {
   if ((window as Window & { Razorpay?: unknown }).Razorpay) {
@@ -16,7 +19,7 @@ const loadRazorpayScript = async () => {
   });
 };
 
-export const startPremiumPayment = async () => {
+export const startPremiumPayment = async (plan: string = "sacred") => {
   const scriptLoaded = await loadRazorpayScript();
   if (!scriptLoaded) {
     return { ok: false, error: "Failed to load payment gateway" };
@@ -30,8 +33,11 @@ export const startPremiumPayment = async () => {
     return { ok: false, error: "You must be logged in to upgrade" };
   }
 
+  const amountPaise = PLAN_AMOUNTS[plan] ?? PLAN_AMOUNTS.sacred;
+  const planLabel = plan === "moksha" ? "Moksha" : "Sacred";
+
   const orderResponse = await supabase.functions.invoke("razorpay-create-order", {
-    body: { amount: PREMIUM_AMOUNT_PAISE, currency: "INR" },
+    body: { amount: amountPaise, currency: "INR", plan },
     headers: { Authorization: `Bearer ${session.access_token}` },
   });
 
@@ -53,7 +59,7 @@ export const startPremiumPayment = async () => {
       amount: order.amount,
       currency: order.currency,
       name: "AatmamIlan",
-      description: "Premium Subscription",
+      description: `${planLabel} Subscription`,
       order_id: order.orderId,
       prefill: {
         email: session.user.email ?? "",
@@ -64,7 +70,7 @@ export const startPremiumPayment = async () => {
         razorpay_signature: string;
       }) => {
         const verifyResponse = await supabase.functions.invoke("razorpay-verify-payment", {
-          body: response,
+          body: { ...response, plan },
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
 

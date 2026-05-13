@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, MapPin, Sparkles, Heart, MessageCircle, Settings, Flag, LogOut } from "lucide-react";
+import { ArrowLeft, MapPin, Sparkles, Heart, MessageCircle, Flag, Cog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -547,13 +547,12 @@ const Profile = () => {
             >
               <ArrowLeft className="h-4 w-4" />
             </Link>
-            <button
-              type="button"
-              onClick={() => void handleLogout()}
+            <Link
+              to="/app/settings"
               className="absolute top-6 right-5 z-[3] h-10 w-10 rounded-full bg-background/80 backdrop-blur grid place-items-center"
             >
-              <Settings className="h-4 w-4" />
-            </button>
+              <Cog className="h-4 w-4" />
+            </Link>
           </div>
 
           <div className="-mt-20 relative px-5">

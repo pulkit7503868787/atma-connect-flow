@@ -15,6 +15,7 @@ import Community from "./pages/Community";
 import Chat from "./pages/Chat";
 import Events from "./pages/Events";
 import Subscription from "./pages/Subscription";
+import Settings from "./pages/Settings";
 import { AppShell } from "./components/AppShell";
 import { AdminRoute } from "./components/AdminRoute";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -47,6 +48,7 @@ const App = () => (
               <Route path="chat/:id" element={<Chat />} />
               <Route path="events" element={<Events />} />
               <Route path="subscription" element={<Subscription />} />
+              <Route path="settings" element={<Settings />} />
             </Route>
           </Route>
           <Route path="*" element={<NotFound />} />

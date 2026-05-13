@@ -68,6 +68,11 @@ export const resetPassword = async (email: string): Promise<AuthResult> => {
   return { error: error?.message ?? null };
 };
 
+export const changePassword = async (newPassword: string): Promise<AuthResult> => {
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  return { error: error?.message ?? null };
+};
+
 export const upsertPublicUser = async (user: User | null): Promise<void> => {
   if (!user) {
     return;
