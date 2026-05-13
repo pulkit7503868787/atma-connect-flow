@@ -13,7 +13,7 @@ import {
   Ban,
   Bell,
   HelpCircle,
-  MessageSquareQuestion,
+  MessageCircleQuestion,
   KeyRound,
   ChevronRight,
   Moon,
@@ -494,7 +494,7 @@ const Settings = () => {
                 <AccordionItem key={i} value={`faq-${i}`} className="border-0 px-4">
                   <AccordionTrigger className="text-sm py-4 hover:no-underline">
                     <span className="flex items-center gap-2 text-left">
-                      <MessageSquareQuestion className="h-4 w-4 text-primary shrink-0" />
+                      <MessageCircleQuestion className="h-4 w-4 text-primary shrink-0" />
                       {faq.q}
                     </span>
                   </AccordionTrigger>
