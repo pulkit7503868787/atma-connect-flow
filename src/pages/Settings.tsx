@@ -266,7 +266,7 @@ const Settings = () => {
   if (loading) {
     return (
       <div className="animate-fade-in">
-        <PageHeader title="Settings" subtitle="Your sacred preferences" back />
+        <PageHeader title="Settings" subtitle="Path, presence, and gentle boundaries" back />
         <p className="px-5 text-sm text-muted-foreground">Loading...</p>
       </div>
     );
@@ -277,7 +277,7 @@ const Settings = () => {
 
   return (
     <div className="animate-fade-in pb-8">
-      <PageHeader title="Settings" subtitle="Your sacred preferences" back />
+      <PageHeader title="Settings" subtitle="Path, presence, and gentle boundaries" back />
 
       <div className="px-5 space-y-6">
         {/* ── Membership Card ── */}
@@ -327,14 +327,14 @@ const Settings = () => {
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </button>
             <button
-              onClick={() => toast("Partner preferences will be available in the next update.")}
+              onClick={() => navigate("/app/profile")}
               className="w-full flex items-center justify-between p-4 text-left hover:bg-secondary/30 transition-colors"
             >
               <div className="flex items-center gap-3">
                 <Settings2 className="h-4 w-4 text-primary shrink-0" />
                 <div>
-                  <p className="text-sm font-medium">Partner Preferences</p>
-                  <p className="text-[11px] text-muted-foreground">Age, path, diet, lifestyle filters</p>
+                  <p className="text-sm font-medium">Partner preferences</p>
+                  <p className="text-[11px] text-muted-foreground">Refine age, rhythm, and lifestyle in your living profile</p>
                 </div>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />

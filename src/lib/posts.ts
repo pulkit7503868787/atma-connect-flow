@@ -2,21 +2,13 @@ import { supabase } from "@/lib/supabaseClient";
 import { getDisplayName, getProfilePhotoUrl, type UserProfile } from "@/lib/db";
 import { getCommunityPostImagePublicUrl } from "@/lib/postStorage";
 
-export type PostCategory =
-  | "reflection"
-  | "satsang"
-  | "event"
-  | "chanting"
-  | "meditation_audio"
-  | "teaching";
+export type PostCategory = "reflection" | "satsang_experience" | "meditation_audio" | "teaching";
 
 export const POST_CATEGORY_LABELS: Record<PostCategory, string> = {
   reflection: "Reflection",
-  satsang: "Satsang invitation",
-  event: "Spiritual gathering",
-  chanting: "Chanting",
+  satsang_experience: "Satsang & experience sharing",
   meditation_audio: "Meditation audio",
-  teaching: "Sacred teaching",
+  teaching: "Teaching",
 };
 
 export type Post = {
@@ -79,16 +71,17 @@ const resolveStoredUrl = (raw: string | null | undefined): string | null => {
 };
 
 const parseCategory = (v: string | null | undefined): PostCategory => {
-  const allowed: PostCategory[] = [
-    "reflection",
-    "satsang",
-    "event",
-    "chanting",
-    "meditation_audio",
-    "teaching",
-  ];
-  if (v && allowed.includes(v as PostCategory)) {
-    return v as PostCategory;
+  const legacyMap: Record<string, PostCategory> = {
+    reflection: "reflection",
+    satsang_experience: "satsang_experience",
+    meditation_audio: "meditation_audio",
+    teaching: "teaching",
+    satsang: "satsang_experience",
+    event: "satsang_experience",
+    chanting: "reflection",
+  };
+  if (v && legacyMap[v]) {
+    return legacyMap[v];
   }
   return "reflection";
 };
@@ -111,11 +104,16 @@ const enrichPosts = async (rows: PostRow[], currentUserId?: string): Promise<Pos
     return [];
   }
 
-  const userIds = [...new Set(rows.map((r) => r.user_id))];
-  const { data: users } = await supabase
-    .from("users")
-    .select("id,email,full_name,avatar_url")
-    .in("id", userIds);
+  let hiddenAuthors = new Set<string>();
+  if (currentUserId) {
+    const { data: hides } = await supabase.from("post_feed_hides").select("hidden_author_id").eq("viewer_id", currentUserId);
+    hiddenAuthors = new Set((hides ?? []).map((h) => h.hidden_author_id));
+  }
+
+  const visible = rows.filter((r) => !hiddenAuthors.has(r.user_id));
+
+  const userIds = [...new Set(visible.map((r) => r.user_id))];
+  const { data: users } = await supabase.from("users").select("id,email,full_name,avatar_url").in("id", userIds);
 
   const userMap = new Map((users ?? []).map((u) => [u.id, u]));
 
@@ -125,7 +123,7 @@ const enrichPosts = async (rows: PostRow[], currentUserId?: string): Promise<Pos
     likedPostIds = new Set((myLikes ?? []).map((l) => l.post_id));
   }
 
-  return rows.map((row) => {
+  return visible.map((row) => {
     const u = userMap.get(row.user_id);
     const mergedPaths = mergeImageUrls(row);
     const image_urls = mergedPaths.map((p) => resolveStoredUrl(p) ?? "").filter(Boolean);
@@ -169,6 +167,37 @@ export const getPosts = async (currentUserId?: string): Promise<Post[]> => {
   return enrichPosts(data as PostRow[], currentUserId);
 };
 
+export const hidePostsFromAuthor = async (authorId: string): Promise<{ ok: boolean; error?: string | null }> => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: "Unauthorized" };
+  }
+  if (authorId === user.id) {
+    return { ok: false, error: "Cannot hide your own posts this way." };
+  }
+  const { error } = await supabase.from("post_feed_hides").insert({ viewer_id: user.id, hidden_author_id: authorId });
+  if (error && error.code !== "23505") {
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+};
+
+export const unhidePostsFromAuthor = async (authorId: string): Promise<{ ok: boolean; error?: string | null }> => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: "Unauthorized" };
+  }
+  const { error } = await supabase.from("post_feed_hides").delete().eq("viewer_id", user.id).eq("hidden_author_id", authorId);
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+};
+
 export type CreatePostPayload = {
   content: string;
   category: PostCategory;
@@ -200,7 +229,7 @@ export const createPost = async (payload: CreatePostPayload): Promise<{ ok: bool
 
   let body = trimmed;
   if (!body && hasEvent) {
-    body = payload.eventTitle?.trim() ?? "Sacred gathering";
+    body = payload.eventTitle?.trim() ?? "Gathering";
   }
   if (!body && hasMedia) {
     body = "Shared with the sangha.";

@@ -11,7 +11,7 @@ const locations = ["Rishikesh", "Bangalore", "Pune", "Varanasi", "Mumbai", "Dhar
 
 /** Columns safe to load for discovery / lists (excludes contact until mutual match RPC). */
 export const USERS_PROFILE_SELECT_PUBLIC =
-  "id,email,full_name,gender,seeking_gender,age,city,guru,practices,bio,avatar_url,onboarding_completed,is_blocked,chat_disabled,diet,lifestyle,created_at," +
+  "id,email,full_name,gender,seeking_gender,age,city,guru,practices,bio,avatar_url,profile_gallery_urls,onboarding_completed,is_blocked,chat_disabled,diet,lifestyle,created_at," +
   "spiritual_path,programs_undergone,sadhana_frequency,spiritual_values,meditation_experience,seva_inclination,guru_notes,guru_photo_url," +
   "marriage_timeline,marital_status,children_preference,relocation_openness,family_orientation," +
   "languages,smoking_habit,drinking_habit,daily_rhythm," +
@@ -67,6 +67,7 @@ export type UserProfile = {
   verification_status: "unverified" | "pending" | "verified";
   whatsapp_number: string | null;
   call_preference: string | null;
+  profile_gallery_urls: string[];
 };
 
 export type UserProfileWithCompatibility = UserProfile & {
@@ -179,6 +180,13 @@ const toUserProfile = (row: Partial<UserProfile> & Record<string, unknown>): Use
   verification_status: verStatus(row.verification_status),
   whatsapp_number: row.whatsapp_number != null ? String(row.whatsapp_number) : null,
   call_preference: row.call_preference != null ? String(row.call_preference) : null,
+  profile_gallery_urls: (() => {
+    const raw = row.profile_gallery_urls;
+    if (Array.isArray(raw)) {
+      return raw.filter((x): x is string => typeof x === "string" && x.trim().length > 0);
+    }
+    return [];
+  })(),
 });
 
 export { toUserProfile as mapSupabaseUserRow };
@@ -324,15 +332,27 @@ export const getAllProfilesExceptMe = async (): Promise<UserProfileWithCompatibi
 
 export const fetchMatchedContactFields = async (
   otherUserId: string
-): Promise<{ whatsapp: string | null; callPreference: string | null }> => {
+): Promise<{
+  whatsapp: string | null;
+  callPreference: string | null;
+  allowPhoneShare: boolean;
+  allowVideoCall: boolean;
+}> => {
   const { data, error } = await supabase.rpc("get_matched_contact_fields", { p_other: otherUserId });
   if (error || !data || typeof data !== "object") {
-    return { whatsapp: null, callPreference: null };
+    return { whatsapp: null, callPreference: null, allowPhoneShare: false, allowVideoCall: false };
   }
-  const o = data as { whatsapp_number?: string | null; call_preference?: string | null };
+  const o = data as {
+    whatsapp_number?: string | null;
+    call_preference?: string | null;
+    allow_phone_share?: boolean;
+    allow_video_call?: boolean;
+  };
   return {
     whatsapp: o.whatsapp_number?.trim() || null,
     callPreference: o.call_preference?.trim() || null,
+    allowPhoneShare: Boolean(o.allow_phone_share),
+    allowVideoCall: Boolean(o.allow_video_call),
   };
 };
 
@@ -347,6 +367,18 @@ export const getDiscoverySuggestionsExceptRelations = async (): Promise<UserProf
   }
   const excluded = await getDiscoveryExcludedUserIds(user.id);
   return all.filter((p) => !excluded.has(p.id));
+};
+
+const MS_NEWCOMER = 21 * 24 * 60 * 60 * 1000;
+
+/** Recently joined souls (still in discovery), for the Connections hub. */
+export const getNewcomerProfilesForViewer = async (): Promise<UserProfileWithCompatibility[]> => {
+  const discovery = await getDiscoverySuggestionsExceptRelations();
+  const cutoff = Date.now() - MS_NEWCOMER;
+  return discovery.filter((p) => {
+    const t = Date.parse(p.created_at);
+    return Number.isFinite(t) && t >= cutoff;
+  });
 };
 
 export const getChats = async (): Promise<ChatListItem[]> => {

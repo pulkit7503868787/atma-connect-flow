@@ -249,26 +249,39 @@ const Onboarding = () => {
             <p className="text-muted-foreground mt-2">The one whose path you walk.</p>
 
             {/* Guru Wheel */}
-            <div className="relative h-[340px] mt-8 mb-4 mx-auto w-full max-w-sm">
+            <div className="relative h-[360px] mt-8 mb-4 mx-auto w-full max-w-sm">
               <div className="absolute inset-0 grid place-items-center">
-                <div className="relative h-72 w-72 animate-spin-slow" style={{ animationDuration: "60s" }}>
+                <div className="relative h-72 w-72 animate-spin-slow" style={{ animationDuration: "88s" }}>
                   {gurus.map((g, i) => {
-                    const angle = (i / gurus.length) * 2 * Math.PI;
-                    const x = Math.cos(angle - Math.PI / 2) * 120;
-                    const y = Math.sin(angle - Math.PI / 2) * 120;
+                    const n = gurus.length;
+                    const angle = (i / n) * 2 * Math.PI;
+                    const radius = n <= 8 ? 118 : 128;
+                    const x = Math.cos(angle - Math.PI / 2) * radius;
+                    const y = Math.sin(angle - Math.PI / 2) * radius;
                     const selected = guru === g.id;
                     return (
                       <button
                         key={g.id}
+                        type="button"
                         onClick={() => setGuru(g.id)}
                         style={{ transform: `translate(${x}px, ${y}px)` }}
                         className={cn(
-                          "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-16 w-16 rounded-full grid place-items-center text-xs font-medium text-center px-1 transition-all border-2",
-                          selected ? "bg-gradient-saffron text-primary-foreground border-primary shadow-warm scale-110" : "bg-card border-border/60 text-foreground hover:border-primary"
+                          "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[4.25rem] w-[4.25rem] rounded-full grid place-items-center text-[11px] font-medium text-center leading-tight px-0.5 transition-all border-2 overflow-hidden",
+                          selected ? "bg-gradient-saffron text-primary-foreground border-primary shadow-warm scale-110 ring-2 ring-primary/30" : "bg-card border-border/60 text-foreground hover:border-primary"
                         )}
                       >
-                        <span className="leading-tight" style={{ animation: "spin-slow 60s linear infinite reverse" }}>
-                          {g.name.split(" ")[0]}
+                        <span
+                          className="relative z-10 block w-full px-0.5"
+                          style={{ animation: "spin-slow 88s linear infinite reverse" }}
+                        >
+                          {g.imageUrl ? (
+                            <span className="flex flex-col items-center gap-0.5">
+                              <img src={g.imageUrl} alt="" className="h-8 w-8 rounded-full object-cover border border-white/30" />
+                              <span className="line-clamp-2">{g.name.split(" ")[0]}</span>
+                            </span>
+                          ) : (
+                            <span className="line-clamp-2">{g.name.split(" ")[0]}</span>
+                          )}
                         </span>
                       </button>
                     );
@@ -333,7 +346,7 @@ const Onboarding = () => {
               <span className="text-4xl">🪷</span>
             </div>
             <h2 className="font-serif text-4xl mt-6">Welcome, {name || "seeker"}</h2>
-            <p className="text-muted-foreground mt-3 max-w-xs mx-auto">Your sacred profile is ready. May this journey lead you to a soul that mirrors your own.</p>
+            <p className="text-muted-foreground mt-3 max-w-xs mx-auto">Your profile is ready. May this journey lead you toward a soul that mirrors your own.</p>
             <div className="glass-card rounded-2xl p-5 mt-8 text-left space-y-2">
               {guru && <Row label="Guru" value={gurus.find((g) => g.id === guru)?.name || ""} />}
               <Row label="Path" value={optionLabel(spiritualPaths, previewSpiritualPath)} />

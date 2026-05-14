@@ -15,6 +15,7 @@ export const gurus: GuruEntry[] = [
     tradition: "Isha Yoga",
     lineage: "Shiva tradition · classical yoga",
     bio: "Founder of Isha Foundation; emphasis on inner engineering and consecrated spaces.",
+    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Sadhguru_Jaggi_Vasudev.jpg/200px-Sadhguru_Jaggi_Vasudev.jpg",
   },
   {
     id: "amma",
@@ -31,8 +32,13 @@ export const gurus: GuruEntry[] = [
     bio: "Breath-based programs and satsang for peace in society.",
   },
   { id: "osho", name: "Osho", tradition: "Meditation", lineage: "Contemplative inquiry", bio: "Dynamic and silent meditation as doorways to awareness." },
-  { id: "ramana", name: "Ramana Maharshi", tradition: "Advaita", lineage: "Self-inquiry", bio: "Who am I? as the direct path to the heart." },
-  { id: "iskcon", name: "Srila Prabhupada", tradition: "ISKCON", lineage: "Gaudiya Vaishnava", bio: "Bhakti through nama and sacred service." },
+  {
+    id: "radhasoami",
+    name: "Radha Soami tradition",
+    tradition: "Sant Mat · Surat Shabd Yoga",
+    lineage: "Inner sound and light",
+    bio: "Meditation on the inner Word with guidance of the living Master; emphasis on ethical living and devotion.",
+  },
   {
     id: "yogananda",
     name: "Paramahansa Yogananda",
@@ -71,7 +77,7 @@ export const sadhanaFrequencies = [
 export const spiritualValues = [
   { id: "ahimsa", label: "Ahimsa" },
   { id: "satya", label: "Satya" },
-  { id: "brahmacharya", label: "Sacred discipline" },
+  { id: "brahmacharya", label: "Brahmacharya (conscious restraint)" },
   { id: "aparigraha", label: "Simplicity" },
   { id: "ishvara_pranidhana", label: "Surrender" },
   { id: "sangha", label: "Sangha" },

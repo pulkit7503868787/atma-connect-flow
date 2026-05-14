@@ -106,7 +106,7 @@ const defaultPlanConfigs: PlanFeatureConfig[] = [
   },
   {
     id: "sacred",
-    plan_name: "Sacred (₹499)",
+    plan_name: "Sacred (₹4,899)",
     can_chat: true,
     can_send_requests: true,
     daily_request_limit: 999,
@@ -123,7 +123,7 @@ const defaultPlanConfigs: PlanFeatureConfig[] = [
   },
   {
     id: "moksha",
-    plan_name: "Moksha (₹1,499)",
+    plan_name: "Moksha (₹9,999)",
     can_chat: true,
     can_send_requests: true,
     daily_request_limit: 999,
@@ -615,8 +615,8 @@ const Admin = () => {
               <div className="flex items-center justify-between py-1">
                 <span className="text-sm font-medium">Total Revenue (est.)</span>
                 <span className="text-sm font-medium">
-                  ₹{subs.filter((s) => s.status === "active" && s.plan === "premium").length * 499 +
-                    subs.filter((s) => s.status === "active" && s.plan === "moksha").length * 1499}
+                  ₹{subs.filter((s) => s.status === "active" && s.plan === "premium").length * 4899 +
+                    subs.filter((s) => s.status === "active" && s.plan === "moksha").length * 9999}
                 </span>
               </div>
             </div>

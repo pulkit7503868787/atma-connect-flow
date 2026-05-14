@@ -36,7 +36,7 @@ export const getCurrentSession = async (): Promise<Session | null> => {
 };
 
 export const signOutUser = async (): Promise<AuthResult> => {
-  const { error } = await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut({ scope: "global" });
   return { error: error?.message ?? null };
 };
 
@@ -44,21 +44,25 @@ export const signInWithGoogle = async (): Promise<AuthResult> => {
   const redirectTo = `${window.location.origin}/auth`;
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo },
+    options: {
+      redirectTo,
+      queryParams: {
+        prompt: "select_account",
+      },
+    },
   });
 
   return { error: error?.message ?? null };
 };
 
-/**
- * Apple Sign-In is not enabled until Apple Developer credentials and Supabase Auth (Apple provider) are configured.
- * TODO (production): In Supabase Dashboard → Authentication → Providers → Apple, set Services ID, Team ID, Key ID,
- * and the signing key. Then replace this with `signInWithOAuth({ provider: 'apple', options: { redirectTo } })`
- * mirroring `signInWithGoogle`. Until then, the UI calls this so no OAuth redirect runs by accident.
- */
-export const signInWithApplePlaceholder = (): AuthResult => ({
-  error: null,
-});
+export const signInWithApple = async (): Promise<AuthResult> => {
+  const redirectTo = `${window.location.origin}/auth`;
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "apple",
+    options: { redirectTo },
+  });
+  return { error: error?.message ?? null };
+};
 
 export const resetPassword = async (email: string): Promise<AuthResult> => {
   const redirectTo = `${window.location.origin}/auth`;

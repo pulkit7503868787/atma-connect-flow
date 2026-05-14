@@ -19,5 +19,6 @@ export const isPremium = async (userId: string) => {
     return false;
   }
 
-  return data.plan === "premium" && data.status === "active";
+  const paid = data.plan === "premium" || data.plan === "moksha";
+  return paid && data.status === "active";
 };

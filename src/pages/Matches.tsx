@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
-import { Heart, X, Star, MapPin, Sparkles, MessageCircle, Check, Bookmark } from "lucide-react";
+import { Heart, X, Star, MapPin, Sparkles, MessageCircle, Check, Bookmark, Phone } from "lucide-react";
 import {
   getDisplayName,
   getCurrentUserProfile,
@@ -9,6 +9,10 @@ import {
   getProfileCity,
   getProfilePhotoUrl,
   getDiscoverySuggestionsExceptRelations,
+  getNewcomerProfilesForViewer,
+  fetchMatchedContactFields,
+  mapSupabaseUserRow,
+  USERS_PROFILE_SELECT_PUBLIC,
   type UserProfile,
 } from "@/lib/db";
 import { type RankedMatch, type MatchingUser } from "@/lib/matching";
@@ -28,6 +32,8 @@ import { createOrGetChat } from "@/lib/chat";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { DiscoverySwipeSurface } from "@/components/connections/DiscoverySwipeSurface";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { supabase } from "@/lib/supabaseClient";
 
 const soulRow = (u: MatchingUser) => (
   <Link key={u.id} to={`/app/profile/${u.id}`} className="flex items-center gap-3 min-w-0">
@@ -103,6 +109,11 @@ const Matches = () => {
   const [passedProfiles, setPassedProfiles] = useState<MatchingUser[]>([]);
   const [shortlistedProfiles, setShortlistedProfiles] = useState<MatchingUser[]>([]);
   const [shortlistedIds, setShortlistedIds] = useState<Set<string>>(new Set());
+  const [blockedProfiles, setBlockedProfiles] = useState<MatchingUser[]>([]);
+  const [newcomerProfiles, setNewcomerProfiles] = useState<MatchingUser[]>([]);
+  const [matchContacts, setMatchContacts] = useState<
+    Map<string, Awaited<ReturnType<typeof fetchMatchedContactFields>>>
+  >(new Map());
   const [me, setMe] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [idx, setIdx] = useState(0);
@@ -117,10 +128,13 @@ const Matches = () => {
       setPassedProfiles([]);
       setShortlistedProfiles([]);
       setShortlistedIds(new Set());
+      setBlockedProfiles([]);
+      setNewcomerProfiles([]);
+      setMatchContacts(new Map());
       setProfiles([]);
       return;
     }
-    const [received, sent, discoveryRows, confirmed, passed, shortlist, slIds] = await Promise.all([
+    const [received, sent, discoveryRows, confirmed, passed, shortlist, slIds, newcomers] = await Promise.all([
       getReceivedRequests(currentUser.id),
       getSentRequests(currentUser.id),
       getDiscoverySuggestionsExceptRelations(),
@@ -128,6 +142,7 @@ const Matches = () => {
       getPassedProfilesForUser(currentUser.id),
       getShortlistedProfiles(currentUser.id),
       getShortlistedUserIds(currentUser.id),
+      getNewcomerProfilesForViewer(),
     ]);
     setIncoming(received.users);
     setOutgoing(sent);
@@ -135,6 +150,22 @@ const Matches = () => {
     setPassedProfiles(passed);
     setShortlistedProfiles(shortlist);
     setShortlistedIds(slIds);
+
+    const { data: blockRows } = await supabase.from("blocked_users").select("blocked_user_id").eq("user_id", currentUser.id);
+    if (blockRows?.length) {
+      const ids = blockRows.map((b) => b.blocked_user_id);
+      const { data: blockedUsers } = await supabase.from("users").select(USERS_PROFILE_SELECT_PUBLIC).in("id", ids);
+      setBlockedProfiles((blockedUsers ?? []).map((row) => mapSupabaseUserRow(row as Record<string, unknown>)));
+    } else {
+      setBlockedProfiles([]);
+    }
+
+    setNewcomerProfiles(
+      newcomers.map((n) => {
+        const { compatibility: _c, match_reasons: _m, ...rest } = n;
+        return rest;
+      })
+    );
 
     const ranked = discoveryRows.map((p) => ({
       ...p,
@@ -371,14 +402,34 @@ const Matches = () => {
     setLoading(false);
   };
 
+  const confirmedIdsKey = useMemo(() => confirmedMatches.map((u) => u.id).sort().join(","), [confirmedMatches]);
+
+  useEffect(() => {
+    if (!me?.id || !confirmedIdsKey) {
+      setMatchContacts(new Map());
+      return;
+    }
+    let cancelled = false;
+    const ids = confirmedIdsKey.split(",").filter(Boolean);
+    void (async () => {
+      const entries = await Promise.all(ids.map(async (oid) => [oid, await fetchMatchedContactFields(oid)] as const));
+      if (!cancelled) {
+        setMatchContacts(new Map(entries));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [me?.id, confirmedIdsKey]);
+
   return (
     <div className="animate-fade-in pb-28">
       <PageHeader
-        title="Connections"
-        subtitle="A calm workspace for discovery, invitations, and bonds — distinct steps, one intentional flow."
+        title="Sambandh"
+        subtitle="Discovery, letters at your threshold, and bonds — each in its own quiet fold (Satya · truthful grouping)."
       />
 
-      <div className="px-5 space-y-14 pt-2">
+      <div className="px-5 space-y-10 pt-2">
         <FlowSection
           sectionId="discovery"
           variant="field"
@@ -487,11 +538,21 @@ const Matches = () => {
           ) : null}
         </FlowSection>
 
+        <Accordion
+          type="multiple"
+          defaultValue={["samvad", "sambandh", "shortlist", "newvoices", "antahstha"]}
+          className="space-y-3"
+        >
+          <AccordionItem value="samvad" className="rounded-2xl border border-border/55 bg-card/25 px-1 sm:px-2">
+            <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">
+              Letters & replies
+            </AccordionTrigger>
+            <AccordionContent className="space-y-8 pb-4 px-1">
         <FlowSection
           sectionId="soul-invitations-received"
           variant="threshold"
           eyebrow="At your threshold"
-          title="Soul invitations received"
+          title="Invitations received"
           description="Another seeker has offered a connection. Receive with clarity, or release with kindness."
           emptyText="No soul is knocking at your door yet. Your presence in the sangha is enough."
           isEmpty={!loading && incoming.length === 0}
@@ -529,31 +590,70 @@ const Matches = () => {
             </div>
           ))}
         </FlowSection>
+            </AccordionContent>
+          </AccordionItem>
 
+          <AccordionItem value="sambandh" className="rounded-2xl border border-primary/15 bg-card/20 px-1 sm:px-2">
+            <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">
+              Mutual recognition · accepted matches
+            </AccordionTrigger>
+            <AccordionContent className="pb-4 px-1">
         <FlowSection
           sectionId="sacred-connections"
           variant="bond"
           eyebrow="Mutual recognition"
-          title="Sacred connections"
-          description="Matched souls — dialogue may open here with reverence."
+          title="Accepted matches"
+          description="When both hearts said yes — dialogue opens here. Contact channels appear only if they chose to share."
           emptyText="When two hearts align, they will appear here. Until then, keep walking in truth."
           isEmpty={!loading && confirmedMatches.length === 0}
           loading={loading}
         >
-          {confirmedMatches.map((u) => (
+          {confirmedMatches.map((u) => {
+            const c = matchContacts.get(u.id);
+            const waDigits = c?.whatsapp ? c.whatsapp.replace(/\D/g, "") : "";
+            return (
             <div key={u.id} className="rounded-2xl border border-primary/15 bg-card/70 p-5 flex flex-col gap-3 shadow-card">
               {soulRow(u)}
-              <Button
-                type="button"
-                className="h-12 w-full bg-gradient-saffron text-primary-foreground shadow-warm"
-                onClick={() => void openChatWithMatch(u.id)}
-              >
-                <MessageCircle className="h-4 w-4 mr-2" /> Open Chat
-              </Button>
+              <div className="grid gap-2">
+                <Button
+                  type="button"
+                  className="h-12 w-full bg-gradient-saffron text-primary-foreground shadow-warm"
+                  onClick={() => void openChatWithMatch(u.id)}
+                >
+                  <MessageCircle className="h-4 w-4 mr-2" /> Open chat
+                </Button>
+                {c?.whatsapp && waDigits.length >= 8 ? (
+                  <a
+                    href={`https://wa.me/${waDigits}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="h-11 w-full rounded-xl border border-border/60 bg-card text-sm font-medium grid place-items-center hover:bg-secondary/40 transition-colors"
+                  >
+                    WhatsApp
+                  </a>
+                ) : null}
+                {c?.whatsapp ? (
+                  <a
+                    href={`tel:${c.whatsapp.replace(/[^\d+]/g, "")}`}
+                    className="h-11 w-full rounded-xl border border-border/60 bg-card text-sm font-medium grid place-items-center hover:bg-secondary/40 transition-colors inline-flex items-center justify-center gap-2"
+                  >
+                    <Phone className="h-4 w-4" /> Call
+                  </a>
+                ) : null}
+                {c?.allowVideoCall ? (
+                  <p className="text-[10px] text-center text-muted-foreground">They are open to video when you both feel ready.</p>
+                ) : null}
+              </div>
             </div>
-          ))}
+            );
+          })}
         </FlowSection>
+            </AccordionContent>
+          </AccordionItem>
 
+          <AccordionItem value="shortlist" className="rounded-2xl border border-accent/20 bg-card/25 px-1 sm:px-2">
+            <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">Held for discernment · shortlist</AccordionTrigger>
+            <AccordionContent className="pb-4 px-1">
         <FlowSection
           sectionId="shortlisted-souls"
           variant="keep"
@@ -573,14 +673,71 @@ const Matches = () => {
             </div>
           ))}
         </FlowSection>
+            </AccordionContent>
+          </AccordionItem>
 
+          <AccordionItem value="newvoices" className="rounded-2xl border border-border/50 bg-card/25 px-1 sm:px-2">
+            <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">New voices (recent arrivals)</AccordionTrigger>
+            <AccordionContent className="pb-4 px-1">
+        <FlowSection
+          sectionId="newcomers-souls"
+          variant="field"
+          eyebrow="Fresh footsteps"
+          title="Newcomers in the field"
+          description="Profiles that joined in the last three weeks — greet them gently if it feels right."
+          emptyText="No very new arrivals visible in discovery right now."
+          isEmpty={!loading && newcomerProfiles.length === 0}
+          loading={loading}
+        >
+          {newcomerProfiles.map((u) => (
+            <div key={u.id} className="rounded-2xl border border-border/50 bg-card/50 p-5 flex flex-col gap-3 shadow-soft">
+              {soulRow(u)}
+              <Link to={`/app/profile/${u.id}`} className="text-xs text-primary font-medium hover:underline">
+                Open profile
+              </Link>
+            </div>
+          ))}
+        </FlowSection>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="antahstha" className="rounded-2xl border border-border/50 bg-card/25 px-1 sm:px-2">
+            <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">Resting ties · blocked voices</AccordionTrigger>
+            <AccordionContent className="pb-4 px-1">
+        <FlowSection
+          sectionId="blocked-souls"
+          variant="release"
+          eyebrow="Boundary held"
+          title="Blocked voices"
+          description="Souls you have asked to rest apart. Unblock from Settings whenever compassion invites a new chapter."
+          emptyText="You have not blocked anyone. May your boundaries stay clear and kind."
+          isEmpty={!loading && blockedProfiles.length === 0}
+          loading={loading}
+        >
+          {blockedProfiles.map((u) => (
+            <div key={u.id} className="rounded-2xl border border-border/45 bg-background/50 p-5 shadow-soft">
+              {soulRow(u)}
+              <Link to="/app/settings" className="text-xs text-primary mt-2 inline-block hover:underline">
+                Manage in Settings
+              </Link>
+            </div>
+          ))}
+        </FlowSection>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="vinrelease" className="rounded-2xl border border-dashed border-border/70 bg-muted/5 px-1 sm:px-2">
+            <AccordionTrigger className="font-serif text-lg px-3 text-muted-foreground hover:no-underline">
+              Released with respect · passed
+            </AccordionTrigger>
+            <AccordionContent className="pb-4 px-1 max-h-[min(22rem,55vh)] overflow-y-auto">
         <FlowSection
           sectionId="passed-souls"
           variant="release"
           eyebrow="Released with respect"
           title="Passed souls"
-          description="Profiles you passed or gently declined — they rest outside Discovery for now."
-          emptyText="No passes yet. Every boundary you hold is sacred."
+          description="Profiles you passed or gently declined — kept here in a compact fold so the living threads stay visible."
+          emptyText="No passes yet. Every boundary you hold matters."
           isEmpty={!loading && passedProfiles.length === 0}
           loading={loading}
         >
@@ -590,6 +747,9 @@ const Matches = () => {
             </div>
           ))}
         </FlowSection>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </div>
     </div>
   );

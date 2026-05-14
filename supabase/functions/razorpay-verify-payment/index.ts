@@ -4,6 +4,7 @@ type VerifyBody = {
   razorpay_payment_id: string;
   razorpay_order_id: string;
   razorpay_signature: string;
+  plan?: string;
 };
 
 const json = (status: number, data: unknown) =>
@@ -25,10 +26,25 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const razorpayKeySecret = Deno.env.get("RAZORPAY_KEY_SECRET");
 
-  if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey || !razorpayKeySecret) {
+  if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
     return json(500, { error: "Missing server configuration" });
+  }
+
+  let keySecret = Deno.env.get("RAZORPAY_KEY_SECRET") ?? "";
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data: cfg } = await admin.from("razorpay_config").select("key_secret").eq("id", 1).maybeSingle();
+  if (cfg?.key_secret?.trim()) {
+    keySecret = cfg.key_secret.trim();
+  }
+
+  if (!keySecret) {
+    return json(500, {
+      error:
+        "Razorpay secret missing. Save it in Admin → Razorpay, or set RAZORPAY_KEY_SECRET on the Edge Function.",
+    });
   }
 
   const authHeader = req.headers.get("Authorization");
@@ -57,7 +73,7 @@ Deno.serve(async (req) => {
   const message = `${body.razorpay_order_id}|${body.razorpay_payment_id}`;
   const key = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(razorpayKeySecret),
+    new TextEncoder().encode(keySecret),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]
@@ -69,11 +85,13 @@ Deno.serve(async (req) => {
     return json(400, { error: "Invalid payment signature" });
   }
 
-  const admin = createClient(supabaseUrl, serviceRoleKey);
+  const rawPlan = typeof body.plan === "string" ? body.plan.trim().toLowerCase() : "";
+  const dbPlan = rawPlan === "moksha" ? "moksha" : "premium";
+
   const { error: upsertError } = await admin.from("subscriptions").upsert(
     {
       user_id: user.id,
-      plan: "premium",
+      plan: dbPlan,
       status: "active",
       updated_at: new Date().toISOString(),
     },
@@ -84,5 +102,5 @@ Deno.serve(async (req) => {
     return json(500, { error: "Failed to activate subscription" });
   }
 
-  return json(200, { success: true });
+  return json(200, { success: true, plan: dbPlan });
 });

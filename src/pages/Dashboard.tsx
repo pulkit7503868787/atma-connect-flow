@@ -140,7 +140,7 @@ const Dashboard = () => {
 
   const identitySummary = useMemo(() => {
     if (!me) {
-      return "Your sacred story will appear as your profile deepens.";
+      return "Your story will appear as your profile deepens.";
     }
     const parts = [
       me.sadhana_frequency ? optionLabel(sadhanaFrequencies, me.sadhana_frequency) : null,
@@ -173,31 +173,35 @@ const Dashboard = () => {
   }, [me, pathLabel]);
 
   const membershipCopy = useMemo(() => {
-    const isPremium = subscription.plan === "premium" && subscription.status === "active";
-    const ending = subscription.plan === "premium" && subscription.status === "cancelled";
-    if (isPremium) {
+    const paid = (subscription.plan === "premium" || subscription.plan === "moksha") && subscription.status === "active";
+    const ending =
+      (subscription.plan === "premium" || subscription.plan === "moksha") && subscription.status === "cancelled";
+    if (paid) {
+      const isMoksha = subscription.plan === "moksha";
       return {
-        title: "Sacred membership",
-        detail: "Your access flows in full grace — unlimited invitations and deeper resonance.",
+        title: isMoksha ? "Moksha path" : "Deeper path (Sacred)",
+        detail: isMoksha
+          ? "Guided depth until union feels complete — invitations, resonance, and matchmaker care."
+          : "Full invitations, chat, and compatibility depth — your field opens with intention.",
         validity: subscription.updated_at
           ? `Last renewed ${new Date(subscription.updated_at).toLocaleDateString()}`
           : "Active on the path",
-        cta: "Manage blessing",
+        cta: "Manage membership",
       };
     }
     if (ending) {
       return {
-        title: "Sacred grace completing",
-        detail: "Premium still rests with you until this cycle closes. Renew when you feel called.",
+        title: "Membership completing",
+        detail: "Paid grace still rests with you until this cycle closes. Renew when you feel called.",
         validity: "Honouring what remains",
         cta: "Continue membership",
       };
     }
     return {
       title: "Seeker path",
-      detail: "Walk at your rhythm. Sacred membership widens the field with intention.",
+      detail: "Walk at your rhythm. Upgrading widens the field with intention.",
       validity: "Open access · gentle limits",
-      cta: "View sacred offerings",
+      cta: "View offerings",
     };
   }, [subscription]);
 
@@ -353,7 +357,7 @@ const Dashboard = () => {
         <div className="flex items-end justify-between gap-2">
           <div>
             <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Sanctuary</p>
-            <h2 className="font-serif text-2xl mt-1">Your sacred journey</h2>
+            <h2 className="font-serif text-2xl mt-1">Your journey</h2>
           </div>
         </div>
 

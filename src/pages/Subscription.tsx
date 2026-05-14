@@ -46,7 +46,7 @@ const plans: PlanDef[] = [
       { text: "Unlimited requests", included: false },
       { text: "Full Guna Milan (36 pts)", included: false },
       { text: "Priority in discovery", included: false },
-      { text: "Verified sacred badge", included: false },
+      { text: "Verified presence badge", included: false },
       { text: "Retreat & Event RSVP", included: false },
       { text: "Personal matchmaker guidance", included: false },
     ],
@@ -56,7 +56,7 @@ const plans: PlanDef[] = [
     id: "sacred",
     name: "Sacred",
     sanskrit: "पवित्र",
-    price: "₹499",
+    price: "₹4,899",
     period: "",
     validity: "6 Months",
     color: "from-primary/30 to-primary/5",
@@ -72,7 +72,7 @@ const plans: PlanDef[] = [
       { text: "Unlimited chat with matches", included: true },
       { text: "See who blessed you", included: true },
       { text: "Priority placement in discovery", included: true },
-      { text: "Verified sacred badge", included: true },
+      { text: "Verified presence badge", included: true },
       { text: "Retreat & Event RSVP", included: true },
       { text: "Video calls with matches", included: true },
       { text: "Personal matchmaker guidance", included: false },
@@ -83,7 +83,7 @@ const plans: PlanDef[] = [
     id: "moksha",
     name: "Moksha",
     sanskrit: "मोक्ष",
-    price: "₹1,499",
+    price: "₹9,999",
     period: "",
     validity: "Until Union",
     color: "from-amber-400/30 to-amber-500/5",
@@ -98,7 +98,7 @@ const plans: PlanDef[] = [
       { text: "Unlimited chat with matches", included: true },
       { text: "See who blessed you", included: true },
       { text: "Top priority in discovery", included: true },
-      { text: "Verified sacred badge", included: true },
+      { text: "Verified presence badge", included: true },
       { text: "Retreat & Event RSVP", included: true },
       { text: "Video calls with matches", included: true },
       { text: "Personal matchmaker guidance", included: true },
@@ -173,7 +173,7 @@ const Subscription = () => {
   };
 
   const handleCancel = async () => {
-    if (!confirm("Are you sure you want to release your sacred membership?")) return;
+    if (!confirm("Release this membership? You can return whenever you are called.")) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { error } = await supabase
@@ -191,7 +191,7 @@ const Subscription = () => {
 
   return (
     <div className="animate-fade-in pb-8">
-      <PageHeader title="Sacred Plans" subtitle="Choose your path on this journey" back />
+      <PageHeader title="Membership paths" subtitle="Choose the depth that feels right for this season" back />
 
       <div className="px-5">
         {/* ── Current Plan Banner ── */}
@@ -205,7 +205,7 @@ const Subscription = () => {
                     {currentPlan === "moksha" ? "Moksha" : currentPlan === "premium" ? "Sacred" : "Seeker"} Path Active
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {currentPlan === "moksha" ? "Until divine union" : currentPlan === "premium" ? "Sacred grace flowing" : "Exploring the sangha"}
+                    {currentPlan === "moksha" ? "Until divine union" : currentPlan === "premium" ? "Full path in bloom" : "Exploring the sangha"}
                   </p>
                 </div>
               </div>
@@ -233,9 +233,9 @@ const Subscription = () => {
         {/* ── Hero ── */}
         <div className="glass-card rounded-2xl p-5 bg-gradient-dusk text-ivory mb-6 relative overflow-hidden">
           <Sparkles className="absolute -top-4 -right-4 h-32 w-32 text-primary-glow/20" />
-          <p className="text-xs uppercase tracking-[0.3em] text-primary-glow">Sacred Union</p>
+          <p className="text-xs uppercase tracking-[0.3em] text-primary-glow">Union · seva · truth</p>
           <p className="font-serif text-3xl mt-2 leading-tight">Three paths, one truth</p>
-          <p className="text-sm opacity-80 mt-2 max-w-xs">Each step is ordained. Choose the depth of your sacred journey.</p>
+          <p className="text-sm opacity-80 mt-2 max-w-xs">Each step unfolds in its own time. Choose the depth that honours where you are today.</p>
         </div>
 
         {/* ── Plan Selector Cards ── */}
@@ -331,7 +331,7 @@ const Subscription = () => {
           </h3>
           <div className="glass-card rounded-2xl p-5 border border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
             <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-              Ancient Vedic astrology analyzes <strong className="text-foreground">36 sacred points</strong> across 8 dimensions of compatibility. The higher the score, the deeper the divine resonance between two souls.
+              Ancient Vedic astrology analyzes <strong className="text-foreground">36 time-honoured points</strong> across 8 dimensions of compatibility. The higher the score, the deeper the felt resonance between two souls.
             </p>
 
             <div className="space-y-2.5">
@@ -411,7 +411,7 @@ const Subscription = () => {
 
         {selected !== "seeker" && (
           <p className="text-center text-xs text-muted-foreground mt-3">
-            By proceeding, you accept our sacred terms of service
+            By proceeding, you accept our terms of service
           </p>
         )}
 

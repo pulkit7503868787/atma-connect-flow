@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { Link } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import {
   Heart,
@@ -14,6 +15,8 @@ import {
   Mic,
   Video,
   LayoutGrid,
+  UserRound,
+  EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,6 +29,7 @@ import {
   addComment,
   getPostLikeSnapshot,
   POST_CATEGORY_LABELS,
+  hidePostsFromAuthor,
   type Post,
   type PostComment,
   type PostCategory,
@@ -35,14 +39,7 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { cn } from "@/lib/utils";
 
-const CATEGORIES: PostCategory[] = [
-  "reflection",
-  "satsang",
-  "event",
-  "chanting",
-  "meditation_audio",
-  "teaching",
-];
+const CATEGORIES: PostCategory[] = ["reflection", "satsang_experience", "meditation_audio", "teaching"];
 
 const Community = () => {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -69,7 +66,7 @@ const Community = () => {
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
   const [comments, setComments] = useState<PostComment[]>([]);
   const [commentText, setCommentText] = useState("");
-  const [loadingComments, setLoadingComments] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
     void loadPosts();
@@ -80,6 +77,7 @@ const Community = () => {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+    setCurrentUserId(user?.id ?? null);
     const data = await getPosts(user?.id);
     setPosts(data);
     setLoading(false);
@@ -127,7 +125,7 @@ const Community = () => {
   };
 
   const handleShare = async () => {
-    const needsEventMeta = category === "satsang" || category === "event";
+    const needsEventMeta = category === "satsang_experience";
     if (needsEventMeta && (!eventTitle.trim() || !eventStartsAt)) {
       toast.error("Please add a title and date for this gathering.");
       return;
@@ -291,6 +289,16 @@ const Community = () => {
     }
   };
 
+  const handleHideAuthor = async (authorId: string) => {
+    const res = await hidePostsFromAuthor(authorId);
+    if (!res.ok) {
+      toast.error(res.error ?? "Could not update feed.");
+      return;
+    }
+    setPosts((prev) => prev.filter((p) => p.user_id !== authorId));
+    toast.success("Their posts will no longer appear in your feed.");
+  };
+
   const timeAgo = (date: string) => {
     const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
     if (seconds < 60) {
@@ -325,7 +333,7 @@ const Community = () => {
     }
   };
 
-  const showEventFields = category === "satsang" || category === "event";
+  const showEventFields = category === "satsang_experience";
 
   const canSubmitShare =
     showEventFields
@@ -370,12 +378,33 @@ const Community = () => {
                   <p className="text-xs text-muted-foreground">{timeAgo(p.created_at)}</p>
                 </div>
               </div>
-              <span className="shrink-0 text-[10px] uppercase tracking-[0.2em] text-primary/80 px-2.5 py-1 rounded-full bg-primary/8 border border-primary/10">
-                {POST_CATEGORY_LABELS[p.category]}
-              </span>
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                <span className="text-[10px] uppercase tracking-[0.2em] text-primary/80 px-2.5 py-1 rounded-full bg-primary/8 border border-primary/10">
+                  {POST_CATEGORY_LABELS[p.category]}
+                </span>
+                {currentUserId && p.user_id !== currentUserId ? (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Link
+                      to={`/app/profile/${p.user_id}`}
+                      className="text-[11px] font-medium text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      <UserRound className="h-3 w-3" />
+                      Profile & connect
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => void handleHideAuthor(p.user_id)}
+                      className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                    >
+                      <EyeOff className="h-3 w-3" />
+                      Hide from feed
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
-            {(p.category === "satsang" || p.category === "event") && (p.event_title || p.event_starts_at) && (
+            {(p.category === "satsang_experience") && (p.event_title || p.event_starts_at) && (
               <div className="mt-4 rounded-2xl border border-primary/12 bg-secondary/30 px-4 py-3 space-y-2 text-sm">
                 {p.cover_image_url ? (
                   <img src={p.cover_image_url} alt="" className="w-full max-h-40 rounded-xl object-cover mb-2" loading="lazy" />
@@ -407,7 +436,7 @@ const Community = () => {
               </div>
             )}
 
-            {p.cover_image_url && p.category !== "satsang" && p.category !== "event" ? (
+            {p.cover_image_url && p.category !== "satsang_experience" ? (
               <img src={p.cover_image_url} alt="" loading="lazy" className="mt-4 w-full max-h-48 rounded-xl object-cover" />
             ) : null}
 

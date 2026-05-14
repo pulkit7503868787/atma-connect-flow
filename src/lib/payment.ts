@@ -1,8 +1,8 @@
 import { supabase } from "@/lib/supabaseClient";
 
 const PLAN_AMOUNTS: Record<string, number> = {
-  sacred: 49900,   // ₹499
-  moksha: 149900,  // ₹1,499
+  sacred: 489900, // ₹4,899
+  moksha: 999900, // ₹9,999
 };
 
 const loadRazorpayScript = async () => {

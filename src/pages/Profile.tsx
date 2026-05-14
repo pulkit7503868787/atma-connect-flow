@@ -111,12 +111,14 @@ const Profile = () => {
   const [editFamilyDetails, setEditFamilyDetails] = useState("");
   const [editWhatsapp, setEditWhatsapp] = useState("");
   const [editCallPreference, setEditCallPreference] = useState("");
+  const [editGalleryUrls, setEditGalleryUrls] = useState<string[]>([]);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [matchedContact, setMatchedContact] = useState<{ whatsapp: string | null; callPreference: string | null } | null>(
+  const [matchedContact, setMatchedContact] = useState<Awaited<ReturnType<typeof fetchMatchedContactFields>> | null>(
     null
   );
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const guruPhotoInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const loadProfileData = async () => {
@@ -170,6 +172,7 @@ const Profile = () => {
     setEditFamilyDetails(me.family_details ?? "");
     setEditWhatsapp(me.whatsapp_number ?? "");
     setEditCallPreference(me.call_preference ?? "");
+    setEditGalleryUrls([...(me.profile_gallery_urls ?? [])]);
   }, [me, isOwn]);
 
   const galleryProfiles = useMemo(() => others.slice(0, 3), [others]);
@@ -307,6 +310,53 @@ const Profile = () => {
     toast.success("Guru image saved.");
   };
 
+  const handleGalleryAdd = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (!files.length || !me?.id) {
+      return;
+    }
+    const room = Math.max(0, 6 - editGalleryUrls.length);
+    const slice = files.slice(0, room);
+    if (!slice.length) {
+      toast.error("You can add up to six gallery images.");
+      return;
+    }
+    const uploadedUrls: string[] = [];
+    for (const file of slice) {
+      const uploaded = await uploadProfileImage(me.id, file);
+      if (uploaded.error || !uploaded.publicUrl) {
+        toast.error(uploaded.error ?? "Could not upload an image.");
+        return;
+      }
+      uploadedUrls.push(uploaded.publicUrl);
+    }
+    const next = [...editGalleryUrls, ...uploadedUrls];
+    setEditGalleryUrls(next);
+    const saved = await updateUserProfile(me.id, { profile_gallery_urls: next });
+    if (!saved.ok) {
+      toast.error(saved.error ?? "Could not save gallery.");
+      return;
+    }
+    setMe((prev) => (prev ? { ...prev, profile_gallery_urls: next } : null));
+    toast.success("Gallery updated.");
+  };
+
+  const handleRemoveGalleryUrl = async (url: string) => {
+    if (!me?.id) {
+      return;
+    }
+    const next = editGalleryUrls.filter((u) => u !== url);
+    setEditGalleryUrls(next);
+    const saved = await updateUserProfile(me.id, { profile_gallery_urls: next });
+    if (!saved.ok) {
+      toast.error(saved.error ?? "Could not update gallery.");
+      setEditGalleryUrls(editGalleryUrls);
+      return;
+    }
+    setMe((prev) => (prev ? { ...prev, profile_gallery_urls: next } : null));
+  };
+
   const handleSaveProfile = async () => {
     if (!me?.id) {
       return;
@@ -374,6 +424,7 @@ const Profile = () => {
       family_details: editFamilyDetails.trim() || null,
       whatsapp_number: editWhatsapp.trim() || null,
       call_preference: editCallPreference || null,
+      profile_gallery_urls: editGalleryUrls,
     });
     setSavingProfile(false);
 
@@ -531,6 +582,15 @@ const Profile = () => {
             tabIndex={-1}
             onChange={(e) => void handleGuruPhotoChange(e)}
           />
+          <input
+            ref={galleryInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            className="sr-only"
+            tabIndex={-1}
+            onChange={(e) => void handleGalleryAdd(e)}
+          />
           <div className="relative aspect-[4/5]">
             <button
               type="button"
@@ -553,6 +613,34 @@ const Profile = () => {
             >
               <Cog className="h-4 w-4" />
             </Link>
+          </div>
+
+          <div className="px-5 pt-4 pb-1">
+            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground mb-2">Gallery</p>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {editGalleryUrls.map((url) => (
+                <div key={url} className="relative h-24 w-24 shrink-0 rounded-xl overflow-hidden border border-border/50">
+                  <img src={url} alt="" className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    aria-label="Remove image"
+                    className="absolute top-1 right-1 h-6 w-6 rounded-full bg-background/90 text-xs font-bold shadow"
+                    onClick={() => void handleRemoveGalleryUrl(url)}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              {editGalleryUrls.length < 6 ? (
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="h-24 w-24 shrink-0 rounded-xl border border-dashed border-border/70 text-muted-foreground text-sm grid place-items-center hover:border-primary/50 hover:text-primary transition-colors"
+                >
+                  + Add
+                </button>
+              ) : null}
+            </div>
           </div>
 
           <div className="-mt-20 relative px-5">
