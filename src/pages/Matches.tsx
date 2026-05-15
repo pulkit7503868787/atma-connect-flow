@@ -39,13 +39,7 @@ import { supabase } from "@/lib/supabaseClient";
    Types
    ─────────────────────────────────────────────── */
 
-type TabKey =
-  | "discovery"
-  | "accepted"
-  | "shortlist"
-  | "new"
-  | "released"
-  | "blocked";
+type TabKey = "discovery" | "invitations" | "shortlist" | "released" | "blocked";
 
 interface SoulTab {
   key: TabKey;
@@ -59,10 +53,9 @@ interface SoulTab {
 
 const TABS: SoulTab[] = [
   { key: "discovery", label: "Discovery", icon: "🌼" },
-  { key: "accepted", label: "Accepted Souls", icon: "🤍" },
-  { key: "shortlist", label: "Shortlisted Souls", icon: "🪔" },
-  { key: "new", label: "New Souls", icon: "✨" },
-  { key: "released", label: "Released With Respect", icon: "🌙" },
+  { key: "invitations", label: "Invitations", icon: "🤍" },
+  { key: "shortlist", label: "Shortlisted", icon: "🪔" },
+  { key: "released", label: "Released", icon: "🌙" },
   { key: "blocked", label: "Dusht Aatmaye", icon: "🔥" },
 ];
 
@@ -83,7 +76,7 @@ const soulRow = (u: MatchingUser) => (
 );
 
 /* ───────────────────────────────────────────────
-   SoulTabs — horizontally scrollable spiritual pills
+   SoulTabs — wrapped spiritual pills, no horizontal scroll
    ─────────────────────────────────────────────── */
 
 function SoulTabs({
@@ -97,7 +90,7 @@ function SoulTabs({
 }) {
   return (
     <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b border-border/30 -mx-5 px-5 py-3">
-      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+      <div className="flex flex-wrap gap-2 justify-center">
         {TABS.map((tab) => {
           const isActive = active === tab.key;
           const count = counts[tab.key] ?? 0;
@@ -107,8 +100,8 @@ function SoulTabs({
               type="button"
               onClick={() => onChange(tab.key)}
               className={`
-                relative flex items-center gap-1.5 shrink-0 px-4 py-2.5 rounded-full text-sm font-medium
-                transition-all duration-300 ease-out whitespace-nowrap
+                relative flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-medium
+                transition-all duration-300 ease-out
                 ${
                   isActive
                     ? "bg-primary text-primary-foreground shadow-warm scale-[1.02]"
@@ -216,7 +209,7 @@ const Matches = () => {
   const [loading, setLoading] = useState(true);
   const [idx, setIdx] = useState(0);
 
-  /* ── NEW: tab state ── */
+  /* ── tab state ── */
   const [activeTab, setActiveTab] = useState<TabKey>("discovery");
 
   /* ── reloadHub (preserved exactly) ── */
@@ -262,12 +255,18 @@ const Matches = () => {
       setBlockedProfiles([]);
     }
 
-    setNewcomerProfiles(
-      newcomers.map((n) => {
+    /* Sort newcomers by created_at desc (newest first) */
+    const sortedNewcomers = newcomers
+      .map((n) => {
         const { compatibility: _c, match_reasons: _m, ...rest } = n;
         return rest;
       })
-    );
+      .sort((a, b) => {
+        const ta = Date.parse(a.created_at ?? "0");
+        const tb = Date.parse(b.created_at ?? "0");
+        return tb - ta;
+      });
+    setNewcomerProfiles(sortedNewcomers);
 
     const ranked = discoveryRows.map((p) => ({
       ...p,
@@ -302,20 +301,18 @@ const Matches = () => {
   /* ── counts for tab badges ── */
   const tabCounts = useMemo(() => {
     const discoveryCount = profiles.length;
-    const acceptedCount = confirmedMatches.length + incoming.length + outgoing.length;
+    const invitationsCount = confirmedMatches.length + incoming.length + outgoing.length;
     const shortlistCount = shortlistedProfiles.length;
-    const newCount = newcomerProfiles.length;
     const releasedCount = passedProfiles.length;
     const blockedCount = blockedProfiles.length;
     return {
       discovery: discoveryCount,
-      accepted: acceptedCount,
+      invitations: invitationsCount,
       shortlist: shortlistCount,
-      new: newCount,
       released: releasedCount,
       blocked: blockedCount,
     };
-  }, [profiles, confirmedMatches, incoming, outgoing, shortlistedProfiles, newcomerProfiles, passedProfiles, blockedProfiles]);
+  }, [profiles, confirmedMatches, incoming, outgoing, shortlistedProfiles, passedProfiles, blockedProfiles]);
 
   /* ── uiProfiles (preserved) ── */
   const uiProfiles = useMemo(
@@ -574,7 +571,7 @@ const Matches = () => {
               isEmpty={!loading && !hasProfiles}
               loading={loading}
             >
-              <div className="relative aspect-[3/4.2] rounded-3xl overflow-hidden shadow-card animate-scale-in">
+              <div className="relative aspect-[3/4.2] rounded-3xl overflow-hidden shadow-card animate-scale-in" style={{ touchAction: "pan-y" }}>
                 {m ? (
                   <DiscoverySwipeSurface
                     disabled={loading}
@@ -672,13 +669,13 @@ const Matches = () => {
               ) : null}
             </FlowSection>
 
-            {/* Discovery also shows newcomers inline */}
+            {/* New Souls inline within Discovery */}
             {newcomerProfiles.length > 0 && (
               <FlowSection
-                sectionId="newcomers-souls"
+                sectionId="new-souls"
                 variant="field"
                 eyebrow="Fresh footsteps"
-                title="New arrivals"
+                title="New Souls"
                 emptyText=""
                 isEmpty={false}
                 loading={loading}
@@ -697,27 +694,27 @@ const Matches = () => {
         )}
 
         {/* ═══════════════════════════════════════════
-            TAB: Accepted Souls
+            TAB: Invitations
             ═══════════════════════════════════════════ */}
-        {activeTab === "accepted" && (
+        {activeTab === "invitations" && (
           <div className="animate-fade-in space-y-6">
             <Accordion
               type="multiple"
-              defaultValue={["samvad", "sambandh"]}
+              defaultValue={["knocking", "offered", "mutual"]}
               className="space-y-3"
             >
-              <AccordionItem value="samvad" className="rounded-2xl border border-border/55 bg-card/25 px-1 sm:px-2">
+              {/* ── Knocking Souls: received invitations ── */}
+              <AccordionItem value="knocking" className="rounded-2xl border border-border/55 bg-card/25 px-1 sm:px-2">
                 <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">
-                  Letters & replies
+                  Knocking Souls
                 </AccordionTrigger>
-                <AccordionContent className="space-y-8 pb-4 px-1">
+                <AccordionContent className="space-y-4 pb-4 px-1">
                   <FlowSection
                     sectionId="soul-invitations-received"
                     variant="threshold"
                     eyebrow="At your threshold"
                     title="Invitations received"
-                    description="Another seeker has offered a connection. Receive with clarity, or release with kindness."
-                    emptyText="No soul is knocking at your door yet. Your presence in the sangha is enough."
+                    emptyText="No one is waiting at your door. Your presence in the sangha is enough."
                     isEmpty={!loading && incoming.length === 0}
                     loading={loading}
                   >
@@ -735,13 +732,20 @@ const Matches = () => {
                       </div>
                     ))}
                   </FlowSection>
+                </AccordionContent>
+              </AccordionItem>
 
+              {/* ── Offered in Faith: sent invitations ── */}
+              <AccordionItem value="offered" className="rounded-2xl border border-border/55 bg-card/25 px-1 sm:px-2">
+                <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">
+                  Offered in Faith
+                </AccordionTrigger>
+                <AccordionContent className="space-y-4 pb-4 px-1">
                   <FlowSection
                     sectionId="invitations-sent"
                     variant="threshold"
-                    eyebrow="Offered in faith"
+                    eyebrow="Awaiting response"
                     title="Invitations sent"
-                    description="Requests you have offered — the other soul has not yet answered. Trust the silence between hearts."
                     emptyText="You have not offered a connection yet. Discovery is where the first step lives."
                     isEmpty={!loading && outgoing.length === 0}
                     loading={loading}
@@ -756,17 +760,18 @@ const Matches = () => {
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem value="sambandh" className="rounded-2xl border border-primary/15 bg-card/20 px-1 sm:px-2">
+              {/* ── Mutual Recognition: accepted matches ── */}
+              <AccordionItem value="mutual" className="rounded-2xl border border-primary/15 bg-card/20 px-1 sm:px-2">
                 <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">
-                  Mutual recognition
+                  Mutual Recognition
                 </AccordionTrigger>
                 <AccordionContent className="pb-4 px-1">
                   <FlowSection
                     sectionId="sacred-connections"
                     variant="bond"
-                    eyebrow="Mutual recognition"
+                    eyebrow="Both hearts said yes"
                     title="Accepted matches"
-                    description="When both hearts said yes — dialogue opens here. Contact channels appear only if they chose to share."
+                    description="Dialogue opens here. Contact channels appear only if they chose to share."
                     emptyText="When two hearts align, they will appear here. Until then, keep walking in truth."
                     isEmpty={!loading && confirmedMatches.length === 0}
                     loading={loading}
@@ -818,7 +823,7 @@ const Matches = () => {
         )}
 
         {/* ═══════════════════════════════════════════
-            TAB: Shortlisted Souls
+            TAB: Shortlisted
             ═══════════════════════════════════════════ */}
         {activeTab === "shortlist" && (
           <div className="animate-fade-in">
@@ -845,34 +850,7 @@ const Matches = () => {
         )}
 
         {/* ═══════════════════════════════════════════
-            TAB: New Souls
-            ═══════════════════════════════════════════ */}
-        {activeTab === "new" && (
-          <div className="animate-fade-in">
-            <FlowSection
-              sectionId="newcomers-souls"
-              variant="field"
-              eyebrow="Fresh footsteps"
-              title="Newcomers in the field"
-              description="Profiles that joined in the last three weeks — greet them gently if it feels right."
-              emptyText="No very new arrivals visible in discovery right now."
-              isEmpty={!loading && newcomerProfiles.length === 0}
-              loading={loading}
-            >
-              {newcomerProfiles.map((u) => (
-                <div key={u.id} className="rounded-2xl border border-border/50 bg-card/50 p-5 flex flex-col gap-3 shadow-soft">
-                  {soulRow(u)}
-                  <Link to={`/app/profile/${u.id}`} className="text-xs text-primary font-medium hover:underline">
-                    Open profile
-                  </Link>
-                </div>
-              ))}
-            </FlowSection>
-          </div>
-        )}
-
-        {/* ═══════════════════════════════════════════
-            TAB: Released With Respect
+            TAB: Released
             ═══════════════════════════════════════════ */}
         {activeTab === "released" && (
           <div className="animate-fade-in">
@@ -881,7 +859,7 @@ const Matches = () => {
               variant="release"
               eyebrow="Released with respect"
               title="Passed souls"
-              description="Profiles you passed or gently declined — kept here in a compact fold so the living threads stay visible."
+              description="Profiles you passed or gently declined — kept here so the threads stay visible."
               emptyText="No passes yet. Every boundary you hold matters."
               isEmpty={!loading && passedProfiles.length === 0}
               loading={loading}
