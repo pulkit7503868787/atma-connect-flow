@@ -12,7 +12,7 @@ export function DiscoverySwipeSurface({ children, onPass, onConnect, onBless, di
   const [drag, setDrag] = useState({ x: 0, y: 0 });
   const [hint, setHint] = useState<"pass" | "connect" | "bless" | null>(null);
   const origin = useRef<{ x: number; y: number } | null>(null);
-  const intent = = useRef<"horizontal" | "vertical" | null>(null);
+  const intent = useRef<"horizontal" | "vertical" | null>(null);
 
   const reset = () => {
     setDrag({ x: 0, y: 0 });
