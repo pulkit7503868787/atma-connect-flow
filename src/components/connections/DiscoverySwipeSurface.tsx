@@ -37,15 +37,19 @@ export function DiscoverySwipeSurface({ children, onPass, onConnect, onBless, di
     if (!intent.current) {
       const absX = Math.abs(x);
       const absY = Math.abs(y);
-      // Threshold to determine intent (8px buffer to avoid jitter)
-      if (absY > absX && absY > 8) {
+      // Threshold to determine intent (10px buffer to avoid jitter)
+      if (absY > absX && absY > 10) {
         intent.current = "vertical";
         // Don't capture — let the page scroll naturally
         return;
       }
-      if (absX > absY && absX > 8) {
+      if (absX > absY && absX > 10) {
         intent.current = "horizontal";
-        e.currentTarget.setPointerCapture(e.pointerId);
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          // setPointerCapture may fail if element already released
+        }
       }
     }
 

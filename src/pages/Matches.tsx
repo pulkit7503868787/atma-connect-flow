@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
-import { Heart, X, Star, MapPin, Sparkles, MessageCircle, Check, Bookmark, Phone } from "lucide-react";
+import { Heart, X, Star, MapPin, Sparkles, MessageCircle, Check, Bookmark, Phone, Eye } from "lucide-react";
 import {
   getDisplayName,
   getCurrentUserProfile,
@@ -39,12 +39,23 @@ import { supabase } from "@/lib/supabaseClient";
    Types
    ─────────────────────────────────────────────── */
 
-type TabKey = "discovery" | "invitations" | "shortlist" | "released" | "blocked";
+type TabKey = "discovery" | "invitations" | "shortlist" | "released";
+
+type DiscoverySub = "flow" | "new" | "visitors";
+type InvitationsSub = "knocking" | "offered" | "mutual";
+type ReleasedSub = "passed" | "blocked";
 
 interface SoulTab {
   key: TabKey;
   label: string;
   icon: string;
+}
+
+interface Chamber {
+  key: string;
+  label: string;
+  icon: string;
+  count?: number;
 }
 
 /* ───────────────────────────────────────────────
@@ -56,7 +67,6 @@ const TABS: SoulTab[] = [
   { key: "invitations", label: "Invitations", icon: "🤍" },
   { key: "shortlist", label: "Shortlisted", icon: "🪔" },
   { key: "released", label: "Released", icon: "🌙" },
-  { key: "blocked", label: "Dusht Aatmaye", icon: "🔥" },
 ];
 
 /* ───────────────────────────────────────────────
@@ -125,6 +135,52 @@ function SoulTabs({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/* ───────────────────────────────────────────────
+   ChamberNav — soft spiritual subsection selector
+   ─────────────────────────────────────────────── */
+
+function ChamberNav({
+  chambers,
+  active,
+  onChange,
+}: {
+  chambers: Chamber[];
+  active: string;
+  onChange: (key: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2 justify-center mb-6">
+      {chambers.map((chamber) => {
+        const isActive = active === chamber.key;
+        return (
+          <button
+            key={chamber.key}
+            type="button"
+            onClick={() => onChange(chamber.key)}
+            className={`
+              flex items-center gap-1.5 px-4 py-2 rounded-2xl text-sm font-medium
+              transition-all duration-300 ease-out border
+              ${
+                isActive
+                  ? "bg-card/80 border-primary/25 text-foreground shadow-soft"
+                  : "bg-card/30 border-border/30 text-muted-foreground hover:bg-card/50 hover:text-foreground"
+              }
+            `}
+          >
+            <span className="text-base leading-none">{chamber.icon}</span>
+            <span>{chamber.label}</span>
+            {chamber.count !== undefined && chamber.count > 0 && (
+              <span className={`ml-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                {chamber.count}
+              </span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -202,6 +258,7 @@ const Matches = () => {
   const [shortlistedIds, setShortlistedIds] = useState<Set<string>>(new Set());
   const [blockedProfiles, setBlockedProfiles] = useState<MatchingUser[]>([]);
   const [newcomerProfiles, setNewcomerProfiles] = useState<MatchingUser[]>([]);
+  const [visitorProfiles, setVisitorProfiles] = useState<MatchingUser[]>([]);
   const [matchContacts, setMatchContacts] = useState<
     Map<string, Awaited<ReturnType<typeof fetchMatchedContactFields>>>
   >(new Map());
@@ -212,7 +269,12 @@ const Matches = () => {
   /* ── tab state ── */
   const [activeTab, setActiveTab] = useState<TabKey>("discovery");
 
-  /* ── reloadHub (preserved exactly) ── */
+  /* ── subsection chamber states ── */
+  const [discoverySub, setDiscoverySub] = useState<DiscoverySub>("flow");
+  const [invitationsSub, setInvitationsSub] = useState<InvitationsSub>("knocking");
+  const [releasedSub, setReleasedSub] = useState<ReleasedSub>("passed");
+
+  /* ── reloadHub (preserved exactly + visitors) ── */
   const reloadHub = useCallback(async () => {
     const currentUser = await getCurrentUserProfile();
     setMe(currentUser);
@@ -225,6 +287,7 @@ const Matches = () => {
       setShortlistedIds(new Set());
       setBlockedProfiles([]);
       setNewcomerProfiles([]);
+      setVisitorProfiles([]);
       setMatchContacts(new Map());
       setProfiles([]);
       return;
@@ -268,6 +331,31 @@ const Matches = () => {
       });
     setNewcomerProfiles(sortedNewcomers);
 
+    /* Fetch visitors — profiles that viewed current user's profile */
+    try {
+      const { data: viewRows } = await supabase
+        .from("profile_views")
+        .select("viewer_id,created_at")
+        .eq("viewed_id", currentUser.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (viewRows?.length) {
+        const viewerIds = [...new Set(viewRows.map((v) => v.viewer_id))];
+        const { data: viewerUsers } = await supabase
+          .from("users")
+          .select(USERS_PROFILE_SELECT_PUBLIC)
+          .in("id", viewerIds);
+        const ordered = viewerIds
+          .map((id) => viewerUsers?.find((u) => u.id === id))
+          .filter(Boolean);
+        setVisitorProfiles(ordered.map((row) => mapSupabaseUserRow(row as Record<string, unknown>)));
+      } else {
+        setVisitorProfiles([]);
+      }
+    } catch {
+      setVisitorProfiles([]);
+    }
+
     const ranked = discoveryRows.map((p) => ({
       ...p,
       compatibility: p.compatibility,
@@ -303,14 +391,12 @@ const Matches = () => {
     const discoveryCount = profiles.length;
     const invitationsCount = confirmedMatches.length + incoming.length + outgoing.length;
     const shortlistCount = shortlistedProfiles.length;
-    const releasedCount = passedProfiles.length;
-    const blockedCount = blockedProfiles.length;
+    const releasedCount = passedProfiles.length + blockedProfiles.length;
     return {
       discovery: discoveryCount,
       invitations: invitationsCount,
       shortlist: shortlistCount,
       released: releasedCount,
-      blocked: blockedCount,
     };
   }, [profiles, confirmedMatches, incoming, outgoing, shortlistedProfiles, passedProfiles, blockedProfiles]);
 
@@ -561,128 +647,166 @@ const Matches = () => {
             ═══════════════════════════════════════════ */}
         {activeTab === "discovery" && (
           <div className="animate-fade-in space-y-8">
-            <FlowSection
-              sectionId="discovery"
-              variant="field"
-              eyebrow="Open field"
-              title="Discovery"
-              description="Souls yet to greet. Swipe gently — left to release, right to invite, upward to bless."
-              emptyText="The field is quiet now. Return after sadhana — new footsteps will appear."
-              isEmpty={!loading && !hasProfiles}
-              loading={loading}
-            >
-              <div className="relative aspect-[3/4.2] rounded-3xl overflow-hidden shadow-card animate-scale-in" style={{ touchAction: "pan-y" }}>
-                {m ? (
-                  <DiscoverySwipeSurface
-                    disabled={loading}
-                    onPass={() => void handlePass(m.id)}
-                    onConnect={() => void handleLike(m.id)}
-                    onBless={() => void handleSuperLike(m.id)}
-                  >
-                    <div className="relative h-full w-full">
-                      <img src={m.photo} alt={m.name} className="absolute inset-0 h-full w-full object-cover" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-                      <div className="absolute top-4 left-4 right-4 flex justify-between items-start gap-2 z-20">
-                        <span className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-semibold text-primary flex items-center gap-1 shrink-0 border border-primary/10">
-                          <Sparkles className="h-3 w-3" /> {m.compatibility}% aligned
-                        </span>
-                        <div className="flex flex-col items-end gap-1.5 shrink-0">
-                          <Link
-                            to={`/app/profile/${m.id}`}
-                            className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-medium border border-border/50"
-                          >
-                            View profile
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => void handleToggleShortlist(m.id)}
-                            className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-medium flex items-center gap-1 border border-border/50"
-                          >
-                            <Bookmark className="h-3 w-3" fill={shortlistedIds.has(m.id) ? "currentColor" : "none"} />
-                            {shortlistedIds.has(m.id) ? "Shortlisted" : "Shortlist"}
-                          </button>
+            <ChamberNav
+              chambers={[
+                { key: "flow", label: "Discovery Flow", icon: "🌼", count: profiles.length },
+                { key: "new", label: "New Souls", icon: "✨", count: newcomerProfiles.length },
+                { key: "visitors", label: "Visitors", icon: "👁", count: visitorProfiles.length },
+              ]}
+              active={discoverySub}
+              onChange={(k) => setDiscoverySub(k as DiscoverySub)}
+            />
+
+            {discoverySub === "flow" && (
+              <FlowSection
+                sectionId="discovery"
+                variant="field"
+                eyebrow="Open field"
+                title="Discovery"
+                description="Souls yet to greet. Swipe gently — left to release, right to invite, upward to bless."
+                emptyText="The field is quiet now. Return after sadhana — new footsteps will appear."
+                isEmpty={!loading && !hasProfiles}
+                loading={loading}
+              >
+                <div className="relative aspect-[3/4.2] rounded-3xl overflow-hidden shadow-card animate-scale-in">
+                  {m ? (
+                    <DiscoverySwipeSurface
+                      disabled={loading}
+                      onPass={() => void handlePass(m.id)}
+                      onConnect={() => void handleLike(m.id)}
+                      onBless={() => void handleSuperLike(m.id)}
+                    >
+                      <div className="relative h-full w-full">
+                        <img src={m.photo} alt={m.name} className="absolute inset-0 h-full w-full object-cover" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                        <div className="absolute top-4 left-4 right-4 flex justify-between items-start gap-2 z-20">
+                          <span className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-semibold text-primary flex items-center gap-1 shrink-0 border border-primary/10">
+                            <Sparkles className="h-3 w-3" /> {m.compatibility}% aligned
+                          </span>
+                          <div className="flex flex-col items-end gap-1.5 shrink-0">
+                            <Link
+                              to={`/app/profile/${m.id}`}
+                              className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-medium border border-border/50"
+                            >
+                              View profile
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => void handleToggleShortlist(m.id)}
+                              className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-medium flex items-center gap-1 border border-border/50"
+                            >
+                              <Bookmark className="h-3 w-3" fill={shortlistedIds.has(m.id) ? "currentColor" : "none"} />
+                              {shortlistedIds.has(m.id) ? "Shortlisted" : "Shortlist"}
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <div className="absolute bottom-0 inset-x-0 p-6 text-ivory z-10 pointer-events-none">
-                        <h3 className="font-serif text-4xl leading-none">
-                          {m.name}, {m.age}
-                        </h3>
-                        <p className="flex items-center gap-1.5 text-sm opacity-90 mt-2">
-                          <MapPin className="h-3.5 w-3.5" /> {m.location}
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          <span className="px-2.5 py-1 rounded-full bg-primary/90 text-primary-foreground text-[11px] font-medium">{m.guru}</span>
-                          {m.practices.slice(0, 2).map((p) => (
-                            <span key={p} className="px-2.5 py-1 rounded-full bg-white/15 backdrop-blur text-white text-[11px] font-medium">
-                              {p}
-                            </span>
-                          ))}
-                        </div>
-                        <p className="text-sm mt-3 opacity-90 line-clamp-2 italic font-serif">&quot;{m.bio}&quot;</p>
-                        {m.matchReasons?.length ? (
-                          <ul className="mt-3 space-y-1 text-[11px] leading-snug opacity-90 border-t border-white/10 pt-3">
-                            {m.matchReasons.slice(0, 3).map((reason) => (
-                              <li key={reason} className="flex gap-2">
-                                <span className="text-primary shrink-0" aria-hidden>
-                                  ·
-                                </span>
-                                <span>{reason}</span>
-                              </li>
+                        <div className="absolute bottom-0 inset-x-0 p-6 text-ivory z-10 pointer-events-none">
+                          <h3 className="font-serif text-4xl leading-none">
+                            {m.name}, {m.age}
+                          </h3>
+                          <p className="flex items-center gap-1.5 text-sm opacity-90 mt-2">
+                            <MapPin className="h-3.5 w-3.5" /> {m.location}
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-1.5">
+                            <span className="px-2.5 py-1 rounded-full bg-primary/90 text-primary-foreground text-[11px] font-medium">{m.guru}</span>
+                            {m.practices.slice(0, 2).map((p) => (
+                              <span key={p} className="px-2.5 py-1 rounded-full bg-white/15 backdrop-blur text-white text-[11px] font-medium">
+                                {p}
+                              </span>
                             ))}
-                          </ul>
-                        ) : null}
+                          </div>
+                          <p className="text-sm mt-3 opacity-90 line-clamp-2 italic font-serif">&quot;{m.bio}&quot;</p>
+                          {m.matchReasons?.length ? (
+                            <ul className="mt-3 space-y-1 text-[11px] leading-snug opacity-90 border-t border-white/10 pt-3">
+                              {m.matchReasons.slice(0, 3).map((reason) => (
+                                <li key={reason} className="flex gap-2">
+                                  <span className="text-primary shrink-0" aria-hidden>
+                                    ·
+                                  </span>
+                                  <span>{reason}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                        </div>
                       </div>
+                    </DiscoverySwipeSurface>
+                  ) : null}
+                </div>
+
+                {m ? (
+                  <>
+                    <div className="flex justify-center gap-5 mt-6">
+                      <button
+                        type="button"
+                        onClick={() => void handlePass(m.id)}
+                        className="h-14 w-14 rounded-full bg-card border border-border shadow-soft grid place-items-center hover:scale-[1.04] transition-transform duration-300"
+                      >
+                        <X className="h-6 w-6 text-muted-foreground" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleLike(m.id)}
+                        className="h-16 w-16 rounded-full bg-gradient-saffron shadow-warm grid place-items-center hover:scale-[1.04] transition-transform duration-300"
+                      >
+                        <Heart className="h-7 w-7 text-primary-foreground" fill="currentColor" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleSuperLike(m.id)}
+                        className="h-14 w-14 rounded-full bg-card border border-border shadow-soft grid place-items-center hover:scale-[1.04] transition-transform duration-300"
+                      >
+                        <Star className="h-6 w-6 text-accent" fill="currentColor" />
+                      </button>
                     </div>
-                  </DiscoverySwipeSurface>
+                    <p className="text-center text-xs text-muted-foreground mt-4 italic leading-relaxed">
+                      Soft gestures on the portrait echo these same intentions
+                    </p>
+                  </>
                 ) : null}
-              </div>
+              </FlowSection>
+            )}
 
-              {m ? (
-                <>
-                  <div className="flex justify-center gap-5 mt-6">
-                    <button
-                      type="button"
-                      onClick={() => void handlePass(m.id)}
-                      className="h-14 w-14 rounded-full bg-card border border-border shadow-soft grid place-items-center hover:scale-[1.04] transition-transform duration-300"
-                    >
-                      <X className="h-6 w-6 text-muted-foreground" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleLike(m.id)}
-                      className="h-16 w-16 rounded-full bg-gradient-saffron shadow-warm grid place-items-center hover:scale-[1.04] transition-transform duration-300"
-                    >
-                      <Heart className="h-7 w-7 text-primary-foreground" fill="currentColor" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleSuperLike(m.id)}
-                      className="h-14 w-14 rounded-full bg-card border border-border shadow-soft grid place-items-center hover:scale-[1.04] transition-transform duration-300"
-                    >
-                      <Star className="h-6 w-6 text-accent" fill="currentColor" />
-                    </button>
-                  </div>
-                  <p className="text-center text-xs text-muted-foreground mt-4 italic leading-relaxed">
-                    Soft gestures on the portrait echo these same intentions
-                  </p>
-                </>
-              ) : null}
-            </FlowSection>
-
-            {/* New Souls inline within Discovery */}
-            {newcomerProfiles.length > 0 && (
+            {discoverySub === "new" && (
               <FlowSection
                 sectionId="new-souls"
                 variant="field"
                 eyebrow="Fresh footsteps"
                 title="New Souls"
-                emptyText=""
-                isEmpty={false}
+                description="Recently arrived — greet them gently if it feels right."
+                emptyText="No new arrivals in the field right now."
+                isEmpty={!loading && newcomerProfiles.length === 0}
                 loading={loading}
               >
                 {newcomerProfiles.map((u) => (
                   <div key={u.id} className="rounded-2xl border border-border/50 bg-card/50 p-5 flex flex-col gap-3 shadow-soft">
                     {soulRow(u)}
+                    <Link to={`/app/profile/${u.id}`} className="text-xs text-primary font-medium hover:underline">
+                      Open profile
+                    </Link>
+                  </div>
+                ))}
+              </FlowSection>
+            )}
+
+            {discoverySub === "visitors" && (
+              <FlowSection
+                sectionId="visitors"
+                variant="field"
+                eyebrow="Quiet footsteps"
+                title="Visitors"
+                description="Souls who paused at your threshold."
+                emptyText="No visitors yet. Your light is still reaching outward."
+                isEmpty={!loading && visitorProfiles.length === 0}
+                loading={loading}
+              >
+                {visitorProfiles.map((u) => (
+                  <div key={u.id} className="rounded-2xl border border-border/50 bg-card/50 p-5 flex flex-col gap-3 shadow-soft">
+                    {soulRow(u)}
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Eye className="h-3 w-3" />
+                      <span>Viewed your profile</span>
+                    </div>
                     <Link to={`/app/profile/${u.id}`} className="text-xs text-primary font-medium hover:underline">
                       Open profile
                     </Link>
@@ -698,127 +822,113 @@ const Matches = () => {
             ═══════════════════════════════════════════ */}
         {activeTab === "invitations" && (
           <div className="animate-fade-in space-y-6">
-            <Accordion
-              type="multiple"
-              defaultValue={["knocking", "offered", "mutual"]}
-              className="space-y-3"
-            >
-              {/* ── Knocking Souls: received invitations ── */}
-              <AccordionItem value="knocking" className="rounded-2xl border border-border/55 bg-card/25 px-1 sm:px-2">
-                <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">
-                  Knocking Souls
-                </AccordionTrigger>
-                <AccordionContent className="space-y-4 pb-4 px-1">
-                  <FlowSection
-                    sectionId="soul-invitations-received"
-                    variant="threshold"
-                    eyebrow="At your threshold"
-                    title="Invitations received"
-                    emptyText="No one is waiting at your door. Your presence in the sangha is enough."
-                    isEmpty={!loading && incoming.length === 0}
-                    loading={loading}
-                  >
-                    {incoming.map((u) => (
-                      <div key={u.id} className="rounded-2xl border border-border/50 bg-card/60 p-5 flex flex-col gap-4 shadow-soft">
-                        {soulRow(u)}
-                        <div className="grid grid-cols-2 gap-3">
-                          <Button type="button" variant="outline" className="h-12 border-border/60 bg-card" onClick={() => void handleRejectIncoming(u.id)}>
-                            Release
-                          </Button>
-                          <Button type="button" className="h-12 bg-gradient-saffron text-primary-foreground shadow-warm" onClick={() => void handleAccept(u.id)}>
-                            <Check className="h-4 w-4 mr-2" /> Accept
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </FlowSection>
-                </AccordionContent>
-              </AccordionItem>
+            <ChamberNav
+              chambers={[
+                { key: "knocking", label: "Knocking Souls", icon: "🚪", count: incoming.length },
+                { key: "offered", label: "Offered in Faith", icon: "🕊", count: outgoing.length },
+                { key: "mutual", label: "Mutual Recognition", icon: "🤍", count: confirmedMatches.length },
+              ]}
+              active={invitationsSub}
+              onChange={(k) => setInvitationsSub(k as InvitationsSub)}
+            />
 
-              {/* ── Offered in Faith: sent invitations ── */}
-              <AccordionItem value="offered" className="rounded-2xl border border-border/55 bg-card/25 px-1 sm:px-2">
-                <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">
-                  Offered in Faith
-                </AccordionTrigger>
-                <AccordionContent className="space-y-4 pb-4 px-1">
-                  <FlowSection
-                    sectionId="invitations-sent"
-                    variant="threshold"
-                    eyebrow="Awaiting response"
-                    title="Invitations sent"
-                    emptyText="You have not offered a connection yet. Discovery is where the first step lives."
-                    isEmpty={!loading && outgoing.length === 0}
-                    loading={loading}
-                  >
-                    {outgoing.map((u) => (
-                      <div key={u.id} className="rounded-2xl border border-border/50 bg-card/50 p-5 flex flex-col gap-3 shadow-soft">
-                        {soulRow(u)}
-                        <p className="text-xs text-muted-foreground">Awaiting their response — trust the timing.</p>
-                      </div>
-                    ))}
-                  </FlowSection>
-                </AccordionContent>
-              </AccordionItem>
+            {invitationsSub === "knocking" && (
+              <FlowSection
+                sectionId="soul-invitations-received"
+                variant="threshold"
+                eyebrow="At your threshold"
+                title="Invitations received"
+                emptyText="No one is waiting at your door. Your presence in the sangha is enough."
+                isEmpty={!loading && incoming.length === 0}
+                loading={loading}
+              >
+                {incoming.map((u) => (
+                  <div key={u.id} className="rounded-2xl border border-border/50 bg-card/60 p-5 flex flex-col gap-4 shadow-soft">
+                    {soulRow(u)}
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button type="button" variant="outline" className="h-12 border-border/60 bg-card" onClick={() => void handleRejectIncoming(u.id)}>
+                        Release
+                      </Button>
+                      <Button type="button" className="h-12 bg-gradient-saffron text-primary-foreground shadow-warm" onClick={() => void handleAccept(u.id)}>
+                        <Check className="h-4 w-4 mr-2" /> Accept
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </FlowSection>
+            )}
 
-              {/* ── Mutual Recognition: accepted matches ── */}
-              <AccordionItem value="mutual" className="rounded-2xl border border-primary/15 bg-card/20 px-1 sm:px-2">
-                <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">
-                  Mutual Recognition
-                </AccordionTrigger>
-                <AccordionContent className="pb-4 px-1">
-                  <FlowSection
-                    sectionId="sacred-connections"
-                    variant="bond"
-                    eyebrow="Both hearts said yes"
-                    title="Accepted matches"
-                    description="Dialogue opens here. Contact channels appear only if they chose to share."
-                    emptyText="When two hearts align, they will appear here. Until then, keep walking in truth."
-                    isEmpty={!loading && confirmedMatches.length === 0}
-                    loading={loading}
-                  >
-                    {confirmedMatches.map((u) => {
-                      const c = matchContacts.get(u.id);
-                      const waDigits = c?.whatsapp ? c.whatsapp.replace(/\D/g, "") : "";
-                      return (
-                        <div key={u.id} className="rounded-2xl border border-primary/15 bg-card/70 p-5 flex flex-col gap-3 shadow-card">
-                          {soulRow(u)}
-                          <div className="grid gap-2">
-                            <Button
-                              type="button"
-                              className="h-12 w-full bg-gradient-saffron text-primary-foreground shadow-warm"
-                              onClick={() => void openChatWithMatch(u.id)}
-                            >
-                              <MessageCircle className="h-4 w-4 mr-2" /> Open chat
-                            </Button>
-                            {c?.whatsapp && waDigits.length >= 8 ? (
-                              <a
-                                href={`https://wa.me/${waDigits}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="h-11 w-full rounded-xl border border-border/60 bg-card text-sm font-medium grid place-items-center hover:bg-secondary/40 transition-colors"
-                              >
-                                WhatsApp
-                              </a>
-                            ) : null}
-                            {c?.whatsapp ? (
-                              <a
-                                href={`tel:${c.whatsapp.replace(/[^\d+]/g, "")}`}
-                                className="h-11 w-full rounded-xl border border-border/60 bg-card text-sm font-medium grid place-items-center hover:bg-secondary/40 transition-colors inline-flex items-center justify-center gap-2"
-                              >
-                                <Phone className="h-4 w-4" /> Call
-                              </a>
-                            ) : null}
-                            {c?.allowVideoCall ? (
-                              <p className="text-[10px] text-center text-muted-foreground">They are open to video when you both feel ready.</p>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </FlowSection>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+            {invitationsSub === "offered" && (
+              <FlowSection
+                sectionId="invitations-sent"
+                variant="threshold"
+                eyebrow="Awaiting response"
+                title="Invitations sent"
+                emptyText="You have not offered a connection yet. Discovery is where the first step lives."
+                isEmpty={!loading && outgoing.length === 0}
+                loading={loading}
+              >
+                {outgoing.map((u) => (
+                  <div key={u.id} className="rounded-2xl border border-border/50 bg-card/50 p-5 flex flex-col gap-3 shadow-soft">
+                    {soulRow(u)}
+                    <p className="text-xs text-muted-foreground">Awaiting their response — trust the timing.</p>
+                  </div>
+                ))}
+              </FlowSection>
+            )}
+
+            {invitationsSub === "mutual" && (
+              <FlowSection
+                sectionId="sacred-connections"
+                variant="bond"
+                eyebrow="Both hearts said yes"
+                title="Accepted matches"
+                description="Dialogue opens here. Contact channels appear only if they chose to share."
+                emptyText="When two hearts align, they will appear here. Until then, keep walking in truth."
+                isEmpty={!loading && confirmedMatches.length === 0}
+                loading={loading}
+              >
+                {confirmedMatches.map((u) => {
+                  const c = matchContacts.get(u.id);
+                  const waDigits = c?.whatsapp ? c.whatsapp.replace(/\D/g, "") : "";
+                  return (
+                    <div key={u.id} className="rounded-2xl border border-primary/15 bg-card/70 p-5 flex flex-col gap-3 shadow-card">
+                      {soulRow(u)}
+                      <div className="grid gap-2">
+                        <Button
+                          type="button"
+                          className="h-12 w-full bg-gradient-saffron text-primary-foreground shadow-warm"
+                          onClick={() => void openChatWithMatch(u.id)}
+                        >
+                          <MessageCircle className="h-4 w-4 mr-2" /> Open chat
+                        </Button>
+                        {c?.whatsapp && waDigits.length >= 8 ? (
+                          <a
+                            href={`https://wa.me/${waDigits}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="h-11 w-full rounded-xl border border-border/60 bg-card text-sm font-medium grid place-items-center hover:bg-secondary/40 transition-colors"
+                          >
+                            WhatsApp
+                          </a>
+                        ) : null}
+                        {c?.whatsapp ? (
+                          <a
+                            href={`tel:${c.whatsapp.replace(/[^\d+]/g, "")}`}
+                            className="h-11 w-full rounded-xl border border-border/60 bg-card text-sm font-medium grid place-items-center hover:bg-secondary/40 transition-colors inline-flex items-center justify-center gap-2"
+                          >
+                            <Phone className="h-4 w-4" /> Call
+                          </a>
+                        ) : null}
+                        {c?.allowVideoCall ? (
+                          <p className="text-[10px] text-center text-muted-foreground">They are open to video when you both feel ready.</p>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </FlowSection>
+            )}
           </div>
         )}
 
@@ -853,52 +963,58 @@ const Matches = () => {
             TAB: Released
             ═══════════════════════════════════════════ */}
         {activeTab === "released" && (
-          <div className="animate-fade-in">
-            <FlowSection
-              sectionId="passed-souls"
-              variant="release"
-              eyebrow="Released with respect"
-              title="Passed souls"
-              description="Profiles you passed or gently declined — kept here so the threads stay visible."
-              emptyText="No passes yet. Every boundary you hold matters."
-              isEmpty={!loading && passedProfiles.length === 0}
-              loading={loading}
-            >
-              <div className="max-h-[min(28rem,60vh)] overflow-y-auto space-y-3 pr-1">
-                {passedProfiles.map((u) => (
+          <div className="animate-fade-in space-y-6">
+            <ChamberNav
+              chambers={[
+                { key: "passed", label: "Released With Respect", icon: "🌙", count: passedProfiles.length },
+                { key: "blocked", label: "Dusht Aatmaye", icon: "🔥", count: blockedProfiles.length },
+              ]}
+              active={releasedSub}
+              onChange={(k) => setReleasedSub(k as ReleasedSub)}
+            />
+
+            {releasedSub === "passed" && (
+              <FlowSection
+                sectionId="passed-souls"
+                variant="release"
+                eyebrow="Released with respect"
+                title="Passed souls"
+                description="Profiles you passed or gently declined — kept here so the threads stay visible."
+                emptyText="No passes yet. Every boundary you hold matters."
+                isEmpty={!loading && passedProfiles.length === 0}
+                loading={loading}
+              >
+                <div className="max-h-[min(28rem,60vh)] overflow-y-auto space-y-3 pr-1">
+                  {passedProfiles.map((u) => (
+                    <div key={u.id} className="rounded-2xl border border-border/45 bg-background/50 p-5 shadow-soft">
+                      {soulRow(u)}
+                    </div>
+                  ))}
+                </div>
+              </FlowSection>
+            )}
+
+            {releasedSub === "blocked" && (
+              <FlowSection
+                sectionId="blocked-souls"
+                variant="release"
+                eyebrow="Boundary held"
+                title="Dusht Aatmaye"
+                description="Souls you have asked to rest apart. Unblock from Settings whenever compassion invites a new chapter."
+                emptyText="You have not blocked anyone. May your boundaries stay clear and kind."
+                isEmpty={!loading && blockedProfiles.length === 0}
+                loading={loading}
+              >
+                {blockedProfiles.map((u) => (
                   <div key={u.id} className="rounded-2xl border border-border/45 bg-background/50 p-5 shadow-soft">
                     {soulRow(u)}
+                    <Link to="/app/settings" className="text-xs text-primary mt-2 inline-block hover:underline">
+                      Manage in Settings
+                    </Link>
                   </div>
                 ))}
-              </div>
-            </FlowSection>
-          </div>
-        )}
-
-        {/* ═══════════════════════════════════════════
-            TAB: Dusht Aatmaye (Blocked)
-            ═══════════════════════════════════════════ */}
-        {activeTab === "blocked" && (
-          <div className="animate-fade-in">
-            <FlowSection
-              sectionId="blocked-souls"
-              variant="release"
-              eyebrow="Boundary held"
-              title="Dusht Aatmaye"
-              description="Souls you have asked to rest apart. Unblock from Settings whenever compassion invites a new chapter."
-              emptyText="You have not blocked anyone. May your boundaries stay clear and kind."
-              isEmpty={!loading && blockedProfiles.length === 0}
-              loading={loading}
-            >
-              {blockedProfiles.map((u) => (
-                <div key={u.id} className="rounded-2xl border border-border/45 bg-background/50 p-5 shadow-soft">
-                  {soulRow(u)}
-                  <Link to="/app/settings" className="text-xs text-primary mt-2 inline-block hover:underline">
-                    Manage in Settings
-                  </Link>
-                </div>
-              ))}
-            </FlowSection>
+              </FlowSection>
+            )}
           </div>
         )}
       </div>
