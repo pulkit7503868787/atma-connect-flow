@@ -24,31 +24,31 @@ const guruPresence = [
     name: "Bade Mandir Guruji",
     quote: "Shukrana Guruji.",
     image:
-      "https://i.imgur.com/y8SxQ8G.jpeg",
+      "https://upload.wikimedia.org/wikipedia/commons/0/0c/Guruji_Bade_Mandir.jpg",
   },
   {
     name: "Neem Karoli Baba",
     quote: "Love everyone. Serve everyone.",
     image:
-      "https://i.imgur.com/8c8QY5R.jpeg",
+      "https://upload.wikimedia.org/wikipedia/commons/3/30/Neem_Karoli_Baba.jpg",
   },
   {
     name: "Anandamayi Ma",
     quote: "Silence also teaches.",
     image:
-      "https://i.imgur.com/Jn6kY7U.jpeg",
+      "https://upload.wikimedia.org/wikipedia/commons/7/70/Anandamayi_Ma_1987.jpg",
   },
   {
     name: "Kabir",
     quote: "The guest is within.",
     image:
-      "https://i.imgur.com/4YkJHjF.jpeg",
+      "https://upload.wikimedia.org/wikipedia/commons/7/7d/Kabir_das.jpg",
   },
   {
     name: "Radhasoami",
     quote: "Surat finds its home within.",
     image:
-      "https://i.imgur.com/0MZQm2P.jpeg",
+      "https://radhasoami.net/images/swami-ji-maharaj.jpg",
   },
 ];
 
