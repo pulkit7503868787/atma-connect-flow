@@ -22,33 +22,53 @@ import { getCurrentUserProfile, isProfileComplete } from "@/lib/db";
 const guruPresence = [
   {
     name: "Bade Mandir Guruji",
-    quote: "Shukrana Guruji.",
-    image:
-      "https://upload.wikimedia.org/wikipedia/commons/0/0c/Guruji_Bade_Mandir.jpg",
+    quote: "Shukarana Guruji! Om Namah Shivaye!",
+    image: "/gurus/bade-mandir-guruji.jpg",
   },
   {
     name: "Neem Karoli Baba",
-    quote: "Love everyone. Serve everyone.",
-    image:
-      "https://upload.wikimedia.org/wikipedia/commons/3/30/Neem_Karoli_Baba.jpg",
+    quote: "Love everyone. Serve everyone. Remember God.",
+    image: "/gurus/neem-karoli.jpg",
   },
   {
-    name: "Anandamayi Ma",
-    quote: "Silence also teaches.",
-    image:
-      "https://upload.wikimedia.org/wikipedia/commons/7/70/Anandamayi_Ma_1987.jpg",
+    name: "Osho",
+    quote: "Be realistic: plan for a miracle.",
+    image: "/gurus/osho.jpg",
   },
   {
-    name: "Kabir",
-    quote: "The guest is within.",
-    image:
-      "https://upload.wikimedia.org/wikipedia/commons/7/7d/Kabir_das.jpg",
+    name: "Sadhguru",
+    quote: "Inner engineering begins with awareness.",
+    image: "/gurus/sadguru.jpg",
   },
   {
-    name: "Radhasoami",
-    quote: "Surat finds its home within.",
-    image:
-      "https://radhasoami.net/images/swami-ji-maharaj.jpg",
+    name: "Sri Krishna",
+    quote: "The soul is neither born, nor does it die.",
+    image: "/gurus/krishna.jpg",
+  },
+  {
+    name: "Paramahansa Yogananda",
+    quote: "Live quietly in the moment and see the beauty of all before you.",
+    image: "/gurus/yogananda.jpg",
+  },
+  {
+    name: "Sri Sri Ravi Shankar",
+    quote: "Wisdom is knowing when to have rest, when to have activity.",
+    image: "/gurus/ravishankar.jpg",
+  },
+  {
+    name: "Premanand Maharaj",
+    quote: "Bhakti is the simplest path to the Divine.",
+    image: "/gurus/premanand.jpg",
+  },
+  {
+    name: "Satyasai Baba",
+    quote: "Love all, serve all.",
+    image: "/gurus/satyasai.jpg",
+  },
+  {
+    name: "Sai Baba",
+    quote: "Why fear when I am here.",
+    image: "/gurus/saibaba.jpg",
   },
 ];
 
