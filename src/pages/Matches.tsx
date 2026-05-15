@@ -35,6 +35,41 @@ import { DiscoverySwipeSurface } from "@/components/connections/DiscoverySwipeSu
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { supabase } from "@/lib/supabaseClient";
 
+/* ───────────────────────────────────────────────
+   Types
+   ─────────────────────────────────────────────── */
+
+type TabKey =
+  | "discovery"
+  | "accepted"
+  | "shortlist"
+  | "new"
+  | "released"
+  | "blocked";
+
+interface SoulTab {
+  key: TabKey;
+  label: string;
+  icon: string;
+}
+
+/* ───────────────────────────────────────────────
+   Constants
+   ─────────────────────────────────────────────── */
+
+const TABS: SoulTab[] = [
+  { key: "discovery", label: "Discovery", icon: "🌼" },
+  { key: "accepted", label: "Accepted Souls", icon: "🤍" },
+  { key: "shortlist", label: "Shortlisted Souls", icon: "🪔" },
+  { key: "new", label: "New Souls", icon: "✨" },
+  { key: "released", label: "Released With Respect", icon: "🌙" },
+  { key: "blocked", label: "Dusht Aatmaye", icon: "🔥" },
+];
+
+/* ───────────────────────────────────────────────
+   Helpers
+   ─────────────────────────────────────────────── */
+
 const soulRow = (u: MatchingUser) => (
   <Link key={u.id} to={`/app/profile/${u.id}`} className="flex items-center gap-3 min-w-0">
     <img src={getProfilePhotoUrl(u)} alt={getDisplayName(u)} className="h-14 w-14 rounded-full object-cover shrink-0" />
@@ -46,6 +81,64 @@ const soulRow = (u: MatchingUser) => (
     </div>
   </Link>
 );
+
+/* ───────────────────────────────────────────────
+   SoulTabs — horizontally scrollable spiritual pills
+   ─────────────────────────────────────────────── */
+
+function SoulTabs({
+  active,
+  onChange,
+  counts,
+}: {
+  active: TabKey;
+  onChange: (key: TabKey) => void;
+  counts: Record<TabKey, number>;
+}) {
+  return (
+    <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b border-border/30 -mx-5 px-5 py-3">
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        {TABS.map((tab) => {
+          const isActive = active === tab.key;
+          const count = counts[tab.key] ?? 0;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => onChange(tab.key)}
+              className={`
+                relative flex items-center gap-1.5 shrink-0 px-4 py-2.5 rounded-full text-sm font-medium
+                transition-all duration-300 ease-out whitespace-nowrap
+                ${
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-warm scale-[1.02]"
+                    : "bg-card/60 text-muted-foreground hover:bg-card hover:text-foreground border border-border/40"
+                }
+              `}
+            >
+              <span className="text-base leading-none">{tab.icon}</span>
+              <span>{tab.label}</span>
+              {count > 0 && (
+                <span
+                  className={`
+                    ml-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full
+                    ${isActive ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"}
+                  `}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ───────────────────────────────────────────────
+   FlowSection — preserved with refined spacing
+   ─────────────────────────────────────────────── */
 
 function FlowSection({
   sectionId,
@@ -98,10 +191,15 @@ function FlowSection({
   );
 }
 
+/* ───────────────────────────────────────────────
+   Matches — main component
+   ─────────────────────────────────────────────── */
+
 const Matches = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  /* ── state (all preserved) ── */
   const [profiles, setProfiles] = useState<RankedMatch[]>([]);
   const [incoming, setIncoming] = useState<MatchingUser[]>([]);
   const [outgoing, setOutgoing] = useState<MatchingUser[]>([]);
@@ -118,6 +216,10 @@ const Matches = () => {
   const [loading, setLoading] = useState(true);
   const [idx, setIdx] = useState(0);
 
+  /* ── NEW: tab state ── */
+  const [activeTab, setActiveTab] = useState<TabKey>("discovery");
+
+  /* ── reloadHub (preserved exactly) ── */
   const reloadHub = useCallback(async () => {
     const currentUser = await getCurrentUserProfile();
     setMe(currentUser);
@@ -197,6 +299,25 @@ const Matches = () => {
     });
   }, [location.hash]);
 
+  /* ── counts for tab badges ── */
+  const tabCounts = useMemo(() => {
+    const discoveryCount = profiles.length;
+    const acceptedCount = confirmedMatches.length + incoming.length + outgoing.length;
+    const shortlistCount = shortlistedProfiles.length;
+    const newCount = newcomerProfiles.length;
+    const releasedCount = passedProfiles.length;
+    const blockedCount = blockedProfiles.length;
+    return {
+      discovery: discoveryCount,
+      accepted: acceptedCount,
+      shortlist: shortlistCount,
+      new: newCount,
+      released: releasedCount,
+      blocked: blockedCount,
+    };
+  }, [profiles, confirmedMatches, incoming, outgoing, shortlistedProfiles, newcomerProfiles, passedProfiles, blockedProfiles]);
+
+  /* ── uiProfiles (preserved) ── */
   const uiProfiles = useMemo(
     () =>
       profiles.map((profile) => ({
@@ -219,6 +340,7 @@ const Matches = () => {
 
   const advance = () => setIdx((i) => i + 1);
 
+  /* ── all handlers (preserved exactly) ── */
   const openChatWithMatch = async (otherUserId: string) => {
     if (!me?.id) {
       toast.error("Please sign in again.");
@@ -422,334 +544,385 @@ const Matches = () => {
     };
   }, [me?.id, confirmedIdsKey]);
 
+  /* ───────────────────────────────────────────────
+     Render
+     ─────────────────────────────────────────────── */
+
   return (
     <div className="animate-fade-in pb-28">
       <PageHeader
         title="Sambandh"
-        subtitle="Discovery, letters at your threshold, and bonds — each in its own quiet fold (Satya · truthful grouping)."
+        subtitle="Where souls meet in quiet recognition."
       />
 
-      <div className="px-5 space-y-10 pt-2">
-        <FlowSection
-          sectionId="discovery"
-          variant="field"
-          eyebrow="Open field"
-          title="Discovery"
-          description="Souls you have not yet greeted, passed, or paired with. Gently swipe on the portrait — left to release, right to invite, upward to bless — or use the buttons below."
-          emptyText="No new souls in the circle right now. Return after sadhana — the field will refresh."
-          isEmpty={!loading && !hasProfiles}
-          loading={loading}
-        >
-          <div className="relative aspect-[3/4.2] rounded-3xl overflow-hidden shadow-card animate-scale-in">
-            {m ? (
-              <DiscoverySwipeSurface
-                disabled={loading}
-                onPass={() => void handlePass(m.id)}
-                onConnect={() => void handleLike(m.id)}
-                onBless={() => void handleSuperLike(m.id)}
-              >
-                <div className="relative h-full w-full">
-                  <img src={m.photo} alt={m.name} className="absolute inset-0 h-full w-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-                  <div className="absolute top-4 left-4 right-4 flex justify-between items-start gap-2 z-20">
-                    <span className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-semibold text-primary flex items-center gap-1 shrink-0 border border-primary/10">
-                      <Sparkles className="h-3 w-3" /> {m.compatibility}% aligned
-                    </span>
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <Link
-                        to={`/app/profile/${m.id}`}
-                        className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-medium border border-border/50"
-                      >
-                        View profile
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => void handleToggleShortlist(m.id)}
-                        className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-medium flex items-center gap-1 border border-border/50"
-                      >
-                        <Bookmark className="h-3 w-3" fill={shortlistedIds.has(m.id) ? "currentColor" : "none"} />
-                        {shortlistedIds.has(m.id) ? "Shortlisted" : "Shortlist"}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="absolute bottom-0 inset-x-0 p-6 text-ivory z-10 pointer-events-none">
-                    <h3 className="font-serif text-4xl leading-none">
-                      {m.name}, {m.age}
-                    </h3>
-                    <p className="flex items-center gap-1.5 text-sm opacity-90 mt-2">
-                      <MapPin className="h-3.5 w-3.5" /> {m.location}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      <span className="px-2.5 py-1 rounded-full bg-primary/90 text-primary-foreground text-[11px] font-medium">{m.guru}</span>
-                      {m.practices.slice(0, 2).map((p) => (
-                        <span key={p} className="px-2.5 py-1 rounded-full bg-white/15 backdrop-blur text-white text-[11px] font-medium">
-                          {p}
+      <div className="px-5 space-y-8 pt-2">
+        {/* ── Spiritual Tab Navigation ── */}
+        <SoulTabs active={activeTab} onChange={setActiveTab} counts={tabCounts} />
+
+        {/* ═══════════════════════════════════════════
+            TAB: Discovery
+            ═══════════════════════════════════════════ */}
+        {activeTab === "discovery" && (
+          <div className="animate-fade-in space-y-8">
+            <FlowSection
+              sectionId="discovery"
+              variant="field"
+              eyebrow="Open field"
+              title="Discovery"
+              description="Souls yet to greet. Swipe gently — left to release, right to invite, upward to bless."
+              emptyText="The field is quiet now. Return after sadhana — new footsteps will appear."
+              isEmpty={!loading && !hasProfiles}
+              loading={loading}
+            >
+              <div className="relative aspect-[3/4.2] rounded-3xl overflow-hidden shadow-card animate-scale-in">
+                {m ? (
+                  <DiscoverySwipeSurface
+                    disabled={loading}
+                    onPass={() => void handlePass(m.id)}
+                    onConnect={() => void handleLike(m.id)}
+                    onBless={() => void handleSuperLike(m.id)}
+                  >
+                    <div className="relative h-full w-full">
+                      <img src={m.photo} alt={m.name} className="absolute inset-0 h-full w-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                      <div className="absolute top-4 left-4 right-4 flex justify-between items-start gap-2 z-20">
+                        <span className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-semibold text-primary flex items-center gap-1 shrink-0 border border-primary/10">
+                          <Sparkles className="h-3 w-3" /> {m.compatibility}% aligned
                         </span>
-                      ))}
-                    </div>
-                    <p className="text-sm mt-3 opacity-90 line-clamp-2 italic font-serif">&quot;{m.bio}&quot;</p>
-                    {m.matchReasons?.length ? (
-                      <ul className="mt-3 space-y-1 text-[11px] leading-snug opacity-90 border-t border-white/10 pt-3">
-                        {m.matchReasons.slice(0, 3).map((reason) => (
-                          <li key={reason} className="flex gap-2">
-                            <span className="text-primary shrink-0" aria-hidden>
-                              ·
+                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                          <Link
+                            to={`/app/profile/${m.id}`}
+                            className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-medium border border-border/50"
+                          >
+                            View profile
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => void handleToggleShortlist(m.id)}
+                            className="px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-medium flex items-center gap-1 border border-border/50"
+                          >
+                            <Bookmark className="h-3 w-3" fill={shortlistedIds.has(m.id) ? "currentColor" : "none"} />
+                            {shortlistedIds.has(m.id) ? "Shortlisted" : "Shortlist"}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="absolute bottom-0 inset-x-0 p-6 text-ivory z-10 pointer-events-none">
+                        <h3 className="font-serif text-4xl leading-none">
+                          {m.name}, {m.age}
+                        </h3>
+                        <p className="flex items-center gap-1.5 text-sm opacity-90 mt-2">
+                          <MapPin className="h-3.5 w-3.5" /> {m.location}
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          <span className="px-2.5 py-1 rounded-full bg-primary/90 text-primary-foreground text-[11px] font-medium">{m.guru}</span>
+                          {m.practices.slice(0, 2).map((p) => (
+                            <span key={p} className="px-2.5 py-1 rounded-full bg-white/15 backdrop-blur text-white text-[11px] font-medium">
+                              {p}
                             </span>
-                            <span>{reason}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
+                          ))}
+                        </div>
+                        <p className="text-sm mt-3 opacity-90 line-clamp-2 italic font-serif">&quot;{m.bio}&quot;</p>
+                        {m.matchReasons?.length ? (
+                          <ul className="mt-3 space-y-1 text-[11px] leading-snug opacity-90 border-t border-white/10 pt-3">
+                            {m.matchReasons.slice(0, 3).map((reason) => (
+                              <li key={reason} className="flex gap-2">
+                                <span className="text-primary shrink-0" aria-hidden>
+                                  ·
+                                </span>
+                                <span>{reason}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </div>
+                    </div>
+                  </DiscoverySwipeSurface>
+                ) : null}
+              </div>
+
+              {m ? (
+                <>
+                  <div className="flex justify-center gap-5 mt-6">
+                    <button
+                      type="button"
+                      onClick={() => void handlePass(m.id)}
+                      className="h-14 w-14 rounded-full bg-card border border-border shadow-soft grid place-items-center hover:scale-[1.04] transition-transform duration-300"
+                    >
+                      <X className="h-6 w-6 text-muted-foreground" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleLike(m.id)}
+                      className="h-16 w-16 rounded-full bg-gradient-saffron shadow-warm grid place-items-center hover:scale-[1.04] transition-transform duration-300"
+                    >
+                      <Heart className="h-7 w-7 text-primary-foreground" fill="currentColor" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleSuperLike(m.id)}
+                      className="h-14 w-14 rounded-full bg-card border border-border shadow-soft grid place-items-center hover:scale-[1.04] transition-transform duration-300"
+                    >
+                      <Star className="h-6 w-6 text-accent" fill="currentColor" />
+                    </button>
                   </div>
-                </div>
-              </DiscoverySwipeSurface>
-            ) : null}
+                  <p className="text-center text-xs text-muted-foreground mt-4 italic leading-relaxed">
+                    Soft gestures on the portrait echo these same intentions
+                  </p>
+                </>
+              ) : null}
+            </FlowSection>
+
+            {/* Discovery also shows newcomers inline */}
+            {newcomerProfiles.length > 0 && (
+              <FlowSection
+                sectionId="newcomers-souls"
+                variant="field"
+                eyebrow="Fresh footsteps"
+                title="New arrivals"
+                emptyText=""
+                isEmpty={false}
+                loading={loading}
+              >
+                {newcomerProfiles.map((u) => (
+                  <div key={u.id} className="rounded-2xl border border-border/50 bg-card/50 p-5 flex flex-col gap-3 shadow-soft">
+                    {soulRow(u)}
+                    <Link to={`/app/profile/${u.id}`} className="text-xs text-primary font-medium hover:underline">
+                      Open profile
+                    </Link>
+                  </div>
+                ))}
+              </FlowSection>
+            )}
           </div>
+        )}
 
-          {m ? (
-            <>
-              <div className="flex justify-center gap-5 mt-6">
-                <button
-                  type="button"
-                  onClick={() => void handlePass(m.id)}
-                  className="h-14 w-14 rounded-full bg-card border border-border shadow-soft grid place-items-center hover:scale-[1.04] transition-transform duration-300"
-                >
-                  <X className="h-6 w-6 text-muted-foreground" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleLike(m.id)}
-                  className="h-16 w-16 rounded-full bg-gradient-saffron shadow-warm grid place-items-center hover:scale-[1.04] transition-transform duration-300"
-                >
-                  <Heart className="h-7 w-7 text-primary-foreground" fill="currentColor" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleSuperLike(m.id)}
-                  className="h-14 w-14 rounded-full bg-card border border-border shadow-soft grid place-items-center hover:scale-[1.04] transition-transform duration-300"
-                >
-                  <Star className="h-6 w-6 text-accent" fill="currentColor" />
-                </button>
-              </div>
-              <p className="text-center text-xs text-muted-foreground mt-4 italic leading-relaxed">
-                Buttons stay as your anchor · soft gestures on the portrait echo the same intentions
-              </p>
-            </>
-          ) : null}
-        </FlowSection>
-
-        <Accordion
-          type="multiple"
-          defaultValue={["samvad", "sambandh", "shortlist", "newvoices", "antahstha"]}
-          className="space-y-3"
-        >
-          <AccordionItem value="samvad" className="rounded-2xl border border-border/55 bg-card/25 px-1 sm:px-2">
-            <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">
-              Letters & replies
-            </AccordionTrigger>
-            <AccordionContent className="space-y-8 pb-4 px-1">
-        <FlowSection
-          sectionId="soul-invitations-received"
-          variant="threshold"
-          eyebrow="At your threshold"
-          title="Invitations received"
-          description="Another seeker has offered a connection. Receive with clarity, or release with kindness."
-          emptyText="No soul is knocking at your door yet. Your presence in the sangha is enough."
-          isEmpty={!loading && incoming.length === 0}
-          loading={loading}
-        >
-          {incoming.map((u) => (
-            <div key={u.id} className="rounded-2xl border border-border/50 bg-card/60 p-5 flex flex-col gap-4 shadow-soft">
-              {soulRow(u)}
-              <div className="grid grid-cols-2 gap-3">
-                <Button type="button" variant="outline" className="h-12 border-border/60 bg-card" onClick={() => void handleRejectIncoming(u.id)}>
-                  Reject
-                </Button>
-                <Button type="button" className="h-12 bg-gradient-saffron text-primary-foreground shadow-warm" onClick={() => void handleAccept(u.id)}>
-                  <Check className="h-4 w-4 mr-2" /> Accept
-                </Button>
-              </div>
-            </div>
-          ))}
-        </FlowSection>
-
-        <FlowSection
-          sectionId="invitations-sent"
-          variant="threshold"
-          eyebrow="Offered in faith"
-          title="Invitations sent"
-          description="Requests you have offered — the other soul has not yet answered. Trust the silence between hearts."
-          emptyText="You have not offered a connection yet. Discovery is where the first step lives."
-          isEmpty={!loading && outgoing.length === 0}
-          loading={loading}
-        >
-          {outgoing.map((u) => (
-            <div key={u.id} className="rounded-2xl border border-border/50 bg-card/50 p-5 flex flex-col gap-3 shadow-soft">
-              {soulRow(u)}
-              <p className="text-xs text-muted-foreground">Awaiting their response — trust the timing.</p>
-            </div>
-          ))}
-        </FlowSection>
-            </AccordionContent>
-          </AccordionItem>
-
-          <AccordionItem value="sambandh" className="rounded-2xl border border-primary/15 bg-card/20 px-1 sm:px-2">
-            <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">
-              Mutual recognition · accepted matches
-            </AccordionTrigger>
-            <AccordionContent className="pb-4 px-1">
-        <FlowSection
-          sectionId="sacred-connections"
-          variant="bond"
-          eyebrow="Mutual recognition"
-          title="Accepted matches"
-          description="When both hearts said yes — dialogue opens here. Contact channels appear only if they chose to share."
-          emptyText="When two hearts align, they will appear here. Until then, keep walking in truth."
-          isEmpty={!loading && confirmedMatches.length === 0}
-          loading={loading}
-        >
-          {confirmedMatches.map((u) => {
-            const c = matchContacts.get(u.id);
-            const waDigits = c?.whatsapp ? c.whatsapp.replace(/\D/g, "") : "";
-            return (
-            <div key={u.id} className="rounded-2xl border border-primary/15 bg-card/70 p-5 flex flex-col gap-3 shadow-card">
-              {soulRow(u)}
-              <div className="grid gap-2">
-                <Button
-                  type="button"
-                  className="h-12 w-full bg-gradient-saffron text-primary-foreground shadow-warm"
-                  onClick={() => void openChatWithMatch(u.id)}
-                >
-                  <MessageCircle className="h-4 w-4 mr-2" /> Open chat
-                </Button>
-                {c?.whatsapp && waDigits.length >= 8 ? (
-                  <a
-                    href={`https://wa.me/${waDigits}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="h-11 w-full rounded-xl border border-border/60 bg-card text-sm font-medium grid place-items-center hover:bg-secondary/40 transition-colors"
+        {/* ═══════════════════════════════════════════
+            TAB: Accepted Souls
+            ═══════════════════════════════════════════ */}
+        {activeTab === "accepted" && (
+          <div className="animate-fade-in space-y-6">
+            <Accordion
+              type="multiple"
+              defaultValue={["samvad", "sambandh"]}
+              className="space-y-3"
+            >
+              <AccordionItem value="samvad" className="rounded-2xl border border-border/55 bg-card/25 px-1 sm:px-2">
+                <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">
+                  Letters & replies
+                </AccordionTrigger>
+                <AccordionContent className="space-y-8 pb-4 px-1">
+                  <FlowSection
+                    sectionId="soul-invitations-received"
+                    variant="threshold"
+                    eyebrow="At your threshold"
+                    title="Invitations received"
+                    description="Another seeker has offered a connection. Receive with clarity, or release with kindness."
+                    emptyText="No soul is knocking at your door yet. Your presence in the sangha is enough."
+                    isEmpty={!loading && incoming.length === 0}
+                    loading={loading}
                   >
-                    WhatsApp
-                  </a>
-                ) : null}
-                {c?.whatsapp ? (
-                  <a
-                    href={`tel:${c.whatsapp.replace(/[^\d+]/g, "")}`}
-                    className="h-11 w-full rounded-xl border border-border/60 bg-card text-sm font-medium grid place-items-center hover:bg-secondary/40 transition-colors inline-flex items-center justify-center gap-2"
+                    {incoming.map((u) => (
+                      <div key={u.id} className="rounded-2xl border border-border/50 bg-card/60 p-5 flex flex-col gap-4 shadow-soft">
+                        {soulRow(u)}
+                        <div className="grid grid-cols-2 gap-3">
+                          <Button type="button" variant="outline" className="h-12 border-border/60 bg-card" onClick={() => void handleRejectIncoming(u.id)}>
+                            Release
+                          </Button>
+                          <Button type="button" className="h-12 bg-gradient-saffron text-primary-foreground shadow-warm" onClick={() => void handleAccept(u.id)}>
+                            <Check className="h-4 w-4 mr-2" /> Accept
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </FlowSection>
+
+                  <FlowSection
+                    sectionId="invitations-sent"
+                    variant="threshold"
+                    eyebrow="Offered in faith"
+                    title="Invitations sent"
+                    description="Requests you have offered — the other soul has not yet answered. Trust the silence between hearts."
+                    emptyText="You have not offered a connection yet. Discovery is where the first step lives."
+                    isEmpty={!loading && outgoing.length === 0}
+                    loading={loading}
                   >
-                    <Phone className="h-4 w-4" /> Call
-                  </a>
-                ) : null}
-                {c?.allowVideoCall ? (
-                  <p className="text-[10px] text-center text-muted-foreground">They are open to video when you both feel ready.</p>
-                ) : null}
+                    {outgoing.map((u) => (
+                      <div key={u.id} className="rounded-2xl border border-border/50 bg-card/50 p-5 flex flex-col gap-3 shadow-soft">
+                        {soulRow(u)}
+                        <p className="text-xs text-muted-foreground">Awaiting their response — trust the timing.</p>
+                      </div>
+                    ))}
+                  </FlowSection>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="sambandh" className="rounded-2xl border border-primary/15 bg-card/20 px-1 sm:px-2">
+                <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">
+                  Mutual recognition
+                </AccordionTrigger>
+                <AccordionContent className="pb-4 px-1">
+                  <FlowSection
+                    sectionId="sacred-connections"
+                    variant="bond"
+                    eyebrow="Mutual recognition"
+                    title="Accepted matches"
+                    description="When both hearts said yes — dialogue opens here. Contact channels appear only if they chose to share."
+                    emptyText="When two hearts align, they will appear here. Until then, keep walking in truth."
+                    isEmpty={!loading && confirmedMatches.length === 0}
+                    loading={loading}
+                  >
+                    {confirmedMatches.map((u) => {
+                      const c = matchContacts.get(u.id);
+                      const waDigits = c?.whatsapp ? c.whatsapp.replace(/\D/g, "") : "";
+                      return (
+                        <div key={u.id} className="rounded-2xl border border-primary/15 bg-card/70 p-5 flex flex-col gap-3 shadow-card">
+                          {soulRow(u)}
+                          <div className="grid gap-2">
+                            <Button
+                              type="button"
+                              className="h-12 w-full bg-gradient-saffron text-primary-foreground shadow-warm"
+                              onClick={() => void openChatWithMatch(u.id)}
+                            >
+                              <MessageCircle className="h-4 w-4 mr-2" /> Open chat
+                            </Button>
+                            {c?.whatsapp && waDigits.length >= 8 ? (
+                              <a
+                                href={`https://wa.me/${waDigits}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="h-11 w-full rounded-xl border border-border/60 bg-card text-sm font-medium grid place-items-center hover:bg-secondary/40 transition-colors"
+                              >
+                                WhatsApp
+                              </a>
+                            ) : null}
+                            {c?.whatsapp ? (
+                              <a
+                                href={`tel:${c.whatsapp.replace(/[^\d+]/g, "")}`}
+                                className="h-11 w-full rounded-xl border border-border/60 bg-card text-sm font-medium grid place-items-center hover:bg-secondary/40 transition-colors inline-flex items-center justify-center gap-2"
+                              >
+                                <Phone className="h-4 w-4" /> Call
+                              </a>
+                            ) : null}
+                            {c?.allowVideoCall ? (
+                              <p className="text-[10px] text-center text-muted-foreground">They are open to video when you both feel ready.</p>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </FlowSection>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════
+            TAB: Shortlisted Souls
+            ═══════════════════════════════════════════ */}
+        {activeTab === "shortlist" && (
+          <div className="animate-fade-in">
+            <FlowSection
+              sectionId="shortlisted-souls"
+              variant="keep"
+              eyebrow="Held gently"
+              title="Shortlisted souls"
+              description="Souls kept close for later reflection."
+              emptyText="Shortlist a soul from Discovery to keep their light close while you discern."
+              isEmpty={!loading && shortlistedProfiles.length === 0}
+              loading={loading}
+            >
+              {shortlistedProfiles.map((u) => (
+                <div key={u.id} className="rounded-2xl border border-accent/20 bg-card/55 p-5 flex flex-col gap-3 shadow-soft">
+                  {soulRow(u)}
+                  <Button type="button" variant="outline" className="h-11 border-border/60 bg-card" onClick={() => void handleRemoveShortlistRow(u.id)}>
+                    Remove from shortlist
+                  </Button>
+                </div>
+              ))}
+            </FlowSection>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════
+            TAB: New Souls
+            ═══════════════════════════════════════════ */}
+        {activeTab === "new" && (
+          <div className="animate-fade-in">
+            <FlowSection
+              sectionId="newcomers-souls"
+              variant="field"
+              eyebrow="Fresh footsteps"
+              title="Newcomers in the field"
+              description="Profiles that joined in the last three weeks — greet them gently if it feels right."
+              emptyText="No very new arrivals visible in discovery right now."
+              isEmpty={!loading && newcomerProfiles.length === 0}
+              loading={loading}
+            >
+              {newcomerProfiles.map((u) => (
+                <div key={u.id} className="rounded-2xl border border-border/50 bg-card/50 p-5 flex flex-col gap-3 shadow-soft">
+                  {soulRow(u)}
+                  <Link to={`/app/profile/${u.id}`} className="text-xs text-primary font-medium hover:underline">
+                    Open profile
+                  </Link>
+                </div>
+              ))}
+            </FlowSection>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════
+            TAB: Released With Respect
+            ═══════════════════════════════════════════ */}
+        {activeTab === "released" && (
+          <div className="animate-fade-in">
+            <FlowSection
+              sectionId="passed-souls"
+              variant="release"
+              eyebrow="Released with respect"
+              title="Passed souls"
+              description="Profiles you passed or gently declined — kept here in a compact fold so the living threads stay visible."
+              emptyText="No passes yet. Every boundary you hold matters."
+              isEmpty={!loading && passedProfiles.length === 0}
+              loading={loading}
+            >
+              <div className="max-h-[min(28rem,60vh)] overflow-y-auto space-y-3 pr-1">
+                {passedProfiles.map((u) => (
+                  <div key={u.id} className="rounded-2xl border border-border/45 bg-background/50 p-5 shadow-soft">
+                    {soulRow(u)}
+                  </div>
+                ))}
               </div>
-            </div>
-            );
-          })}
-        </FlowSection>
-            </AccordionContent>
-          </AccordionItem>
+            </FlowSection>
+          </div>
+        )}
 
-          <AccordionItem value="shortlist" className="rounded-2xl border border-accent/20 bg-card/25 px-1 sm:px-2">
-            <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">Held for discernment · shortlist</AccordionTrigger>
-            <AccordionContent className="pb-4 px-1">
-        <FlowSection
-          sectionId="shortlisted-souls"
-          variant="keep"
-          eyebrow="Held gently"
-          title="Shortlisted souls"
-          description="Souls you marked to revisit — they rest here and step out of Discovery until you release them."
-          emptyText="Shortlist a soul from Discovery to keep their light close while you discern."
-          isEmpty={!loading && shortlistedProfiles.length === 0}
-          loading={loading}
-        >
-          {shortlistedProfiles.map((u) => (
-            <div key={u.id} className="rounded-2xl border border-accent/20 bg-card/55 p-5 flex flex-col gap-3 shadow-soft">
-              {soulRow(u)}
-              <Button type="button" variant="outline" className="h-11 border-border/60 bg-card" onClick={() => void handleRemoveShortlistRow(u.id)}>
-                Remove from shortlist
-              </Button>
-            </div>
-          ))}
-        </FlowSection>
-            </AccordionContent>
-          </AccordionItem>
-
-          <AccordionItem value="newvoices" className="rounded-2xl border border-border/50 bg-card/25 px-1 sm:px-2">
-            <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">New voices (recent arrivals)</AccordionTrigger>
-            <AccordionContent className="pb-4 px-1">
-        <FlowSection
-          sectionId="newcomers-souls"
-          variant="field"
-          eyebrow="Fresh footsteps"
-          title="Newcomers in the field"
-          description="Profiles that joined in the last three weeks — greet them gently if it feels right."
-          emptyText="No very new arrivals visible in discovery right now."
-          isEmpty={!loading && newcomerProfiles.length === 0}
-          loading={loading}
-        >
-          {newcomerProfiles.map((u) => (
-            <div key={u.id} className="rounded-2xl border border-border/50 bg-card/50 p-5 flex flex-col gap-3 shadow-soft">
-              {soulRow(u)}
-              <Link to={`/app/profile/${u.id}`} className="text-xs text-primary font-medium hover:underline">
-                Open profile
-              </Link>
-            </div>
-          ))}
-        </FlowSection>
-            </AccordionContent>
-          </AccordionItem>
-
-          <AccordionItem value="antahstha" className="rounded-2xl border border-border/50 bg-card/25 px-1 sm:px-2">
-            <AccordionTrigger className="font-serif text-lg px-3 hover:no-underline">Resting ties · blocked voices</AccordionTrigger>
-            <AccordionContent className="pb-4 px-1">
-        <FlowSection
-          sectionId="blocked-souls"
-          variant="release"
-          eyebrow="Boundary held"
-          title="Blocked voices"
-          description="Souls you have asked to rest apart. Unblock from Settings whenever compassion invites a new chapter."
-          emptyText="You have not blocked anyone. May your boundaries stay clear and kind."
-          isEmpty={!loading && blockedProfiles.length === 0}
-          loading={loading}
-        >
-          {blockedProfiles.map((u) => (
-            <div key={u.id} className="rounded-2xl border border-border/45 bg-background/50 p-5 shadow-soft">
-              {soulRow(u)}
-              <Link to="/app/settings" className="text-xs text-primary mt-2 inline-block hover:underline">
-                Manage in Settings
-              </Link>
-            </div>
-          ))}
-        </FlowSection>
-            </AccordionContent>
-          </AccordionItem>
-
-          <AccordionItem value="vinrelease" className="rounded-2xl border border-dashed border-border/70 bg-muted/5 px-1 sm:px-2">
-            <AccordionTrigger className="font-serif text-lg px-3 text-muted-foreground hover:no-underline">
-              Released with respect · passed
-            </AccordionTrigger>
-            <AccordionContent className="pb-4 px-1 max-h-[min(22rem,55vh)] overflow-y-auto">
-        <FlowSection
-          sectionId="passed-souls"
-          variant="release"
-          eyebrow="Released with respect"
-          title="Passed souls"
-          description="Profiles you passed or gently declined — kept here in a compact fold so the living threads stay visible."
-          emptyText="No passes yet. Every boundary you hold matters."
-          isEmpty={!loading && passedProfiles.length === 0}
-          loading={loading}
-        >
-          {passedProfiles.map((u) => (
-            <div key={u.id} className="rounded-2xl border border-border/45 bg-background/50 p-5 shadow-soft">
-              {soulRow(u)}
-            </div>
-          ))}
-        </FlowSection>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
+        {/* ═══════════════════════════════════════════
+            TAB: Dusht Aatmaye (Blocked)
+            ═══════════════════════════════════════════ */}
+        {activeTab === "blocked" && (
+          <div className="animate-fade-in">
+            <FlowSection
+              sectionId="blocked-souls"
+              variant="release"
+              eyebrow="Boundary held"
+              title="Dusht Aatmaye"
+              description="Souls you have asked to rest apart. Unblock from Settings whenever compassion invites a new chapter."
+              emptyText="You have not blocked anyone. May your boundaries stay clear and kind."
+              isEmpty={!loading && blockedProfiles.length === 0}
+              loading={loading}
+            >
+              {blockedProfiles.map((u) => (
+                <div key={u.id} className="rounded-2xl border border-border/45 bg-background/50 p-5 shadow-soft">
+                  {soulRow(u)}
+                  <Link to="/app/settings" className="text-xs text-primary mt-2 inline-block hover:underline">
+                    Manage in Settings
+                  </Link>
+                </div>
+              ))}
+            </FlowSection>
+          </div>
+        )}
       </div>
     </div>
   );
