@@ -1,5 +1,5 @@
 import { calculateAISpiritualCompatibility, computeFinalCompatibilityScore } from "@/lib/aiMatching";
-import { gurus } from "@/lib/onboardingOptions";
+import { gurus, parseSpiritualPathIds } from "@/lib/onboardingOptions";
 
 export type CompatibilityResult = {
   score: number;
@@ -64,9 +64,20 @@ export const computeStructuredCompatibility = (me: CompatibilityInput, other: Co
     pushReason(practiceOverlap > 1 ? "Harmonized daily practices" : "A shared practice on the path", pts);
   }
 
-  const spMe = str(me.spiritual_path);
-  if (spMe && spMe === str(other.spiritual_path)) {
-    pushReason("Aligned spiritual path", 14);
+  const pathOverlap = overlapCount(
+    parseSpiritualPathIds(str(me.spiritual_path)),
+    parseSpiritualPathIds(str(other.spiritual_path))
+  );
+  if (pathOverlap > 0) {
+    pushReason(
+      pathOverlap > 1 ? "Shared spiritual affiliations" : "Aligned spiritual path",
+      Math.min(14, pathOverlap * 5)
+    );
+  } else {
+    const spMe = str(me.spiritual_path);
+    if (spMe && spMe === str(other.spiritual_path)) {
+      pushReason("Aligned spiritual path", 14);
+    }
   }
 
   const sfMe = str(me.sadhana_frequency);

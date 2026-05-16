@@ -15,7 +15,7 @@ export const USERS_PROFILE_SELECT_PUBLIC =
   "spiritual_path,programs_undergone,sadhana_frequency,spiritual_values,meditation_experience,seva_inclination,guru_notes,guru_photo_url," +
   "marriage_timeline,marital_status,children_preference,relocation_openness,family_orientation," +
   "languages,smoking_habit,drinking_habit,daily_rhythm," +
-  "religion,caste,nakshatra,gothram," +
+  "religion,caste,nakshatra,gothram,birth_date,birth_time,birth_place," +
   "occupation,education,income_range,height_cm,family_details,verification_status";
 
 export const USERS_PROFILE_SELECT_SELF = `${USERS_PROFILE_SELECT_PUBLIC},whatsapp_number,call_preference`;
@@ -59,6 +59,9 @@ export type UserProfile = {
   caste: string | null;
   nakshatra: string | null;
   gothram: string | null;
+  birth_date: string | null;
+  birth_time: string | null;
+  birth_place: string | null;
   occupation: string | null;
   education: string | null;
   income_range: string | null;
@@ -172,6 +175,9 @@ const toUserProfile = (row: Partial<UserProfile> & Record<string, unknown>): Use
   caste: row.caste != null ? String(row.caste) : null,
   nakshatra: row.nakshatra != null ? String(row.nakshatra) : null,
   gothram: row.gothram != null ? String(row.gothram) : null,
+  birth_date: row.birth_date != null ? String(row.birth_date) : null,
+  birth_time: row.birth_time != null ? String(row.birth_time) : null,
+  birth_place: row.birth_place != null ? String(row.birth_place) : null,
   occupation: row.occupation != null ? String(row.occupation) : null,
   education: row.education != null ? String(row.education) : null,
   income_range: row.income_range != null ? String(row.income_range) : null,
@@ -264,6 +270,21 @@ export const getProfilePhotoUrl = (profile: Pick<UserProfile, "id" | "avatar_url
     return profile.avatar_url.trim();
   }
   return getAvatarForId(profile.id);
+};
+
+/** Avatar first, then gallery URLs (for swipeable profile view). */
+export const getProfilePhotoUrls = (
+  profile: Pick<UserProfile, "id" | "avatar_url" | "profile_gallery_urls">
+): string[] => {
+  const urls: string[] = [];
+  const avatar = profile.avatar_url?.trim();
+  if (avatar) urls.push(avatar);
+  for (const u of profile.profile_gallery_urls ?? []) {
+    const t = u?.trim();
+    if (t && !urls.includes(t)) urls.push(t);
+  }
+  if (!urls.length) urls.push(getAvatarForId(profile.id));
+  return urls;
 };
 
 export const getDisplayName = (profile: Pick<UserProfile, "full_name" | "email">) => {

@@ -7,10 +7,19 @@ type VerifyBody = {
   plan?: string;
 };
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
 const json = (status: number, data: unknown) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...corsHeaders,
+    },
   });
 
 const toHex = (buffer: ArrayBuffer) =>
@@ -19,6 +28,11 @@ const toHex = (buffer: ArrayBuffer) =>
     .join("");
 
 Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   if (req.method !== "POST") {
     return json(405, { error: "Method not allowed" });
   }
@@ -32,10 +46,20 @@ Deno.serve(async (req) => {
   }
 
   let keySecret = Deno.env.get("RAZORPAY_KEY_SECRET") ?? "";
+
   const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
   });
-  const { data: cfg } = await admin.from("razorpay_config").select("key_secret").eq("id", 1).maybeSingle();
+
+  const { data: cfg } = await admin
+    .from("razorpay_config")
+    .select("key_secret")
+    .eq("id", 1)
+    .maybeSingle();
+
   if (cfg?.key_secret?.trim()) {
     keySecret = cfg.key_secret.trim();
   }
@@ -43,19 +67,26 @@ Deno.serve(async (req) => {
   if (!keySecret) {
     return json(500, {
       error:
-        "Razorpay secret missing. Save it in Admin → Razorpay, or set RAZORPAY_KEY_SECRET on the Edge Function.",
+        "Razorpay secret missing. Save it in Admin → Razorpay.",
     });
   }
 
   const authHeader = req.headers.get("Authorization");
+
   if (!authHeader) {
     return json(401, { error: "Unauthorized" });
   }
 
   const token = authHeader.replace("Bearer ", "");
+
   const authClient = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authHeader } },
+    global: {
+      headers: {
+        Authorization: authHeader,
+      },
+    },
   });
+
   const {
     data: { user },
     error: authError,
@@ -66,11 +97,19 @@ Deno.serve(async (req) => {
   }
 
   const body = (await req.json()) as VerifyBody;
-  if (!body.razorpay_order_id || !body.razorpay_payment_id || !body.razorpay_signature) {
-    return json(400, { error: "Missing payment verification fields" });
+
+  if (
+    !body.razorpay_order_id ||
+    !body.razorpay_payment_id ||
+    !body.razorpay_signature
+  ) {
+    return json(400, {
+      error: "Missing payment verification fields",
+    });
   }
 
   const message = `${body.razorpay_order_id}|${body.razorpay_payment_id}`;
+
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(keySecret),
@@ -78,29 +117,48 @@ Deno.serve(async (req) => {
     false,
     ["sign"]
   );
-  const signatureBuffer = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
+
+  const signatureBuffer = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(message)
+  );
+
   const expectedSignature = toHex(signatureBuffer);
 
   if (expectedSignature !== body.razorpay_signature) {
     return json(400, { error: "Invalid payment signature" });
   }
 
-  const rawPlan = typeof body.plan === "string" ? body.plan.trim().toLowerCase() : "";
+  const rawPlan =
+    typeof body.plan === "string"
+      ? body.plan.trim().toLowerCase()
+      : "";
+
   const dbPlan = rawPlan === "moksha" ? "moksha" : "premium";
 
-  const { error: upsertError } = await admin.from("subscriptions").upsert(
-    {
-      user_id: user.id,
-      plan: dbPlan,
-      status: "active",
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "user_id" }
-  );
+  const { error: upsertError } = await admin
+    .from("subscriptions")
+    .upsert(
+      {
+        user_id: user.id,
+        plan: dbPlan,
+        status: "active",
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "user_id",
+      }
+    );
 
   if (upsertError) {
-    return json(500, { error: "Failed to activate subscription" });
+    return json(500, {
+      error: "Failed to activate subscription",
+    });
   }
 
-  return json(200, { success: true, plan: dbPlan });
+  return json(200, {
+    success: true,
+    plan: dbPlan,
+  });
 });

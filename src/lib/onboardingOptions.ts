@@ -4,67 +4,250 @@ export type GuruEntry = {
   tradition: string;
   lineage?: string;
   bio?: string;
-  /** Optional portrait URL (HTTPS). Leave empty when not hosted. */
-  imageUrl?: string | null;
+  /** Local portrait under /public/gurus */
+  imagePath?: string | null;
+  shortLabel?: string;
+};
+
+export const OTHER_WRITE_ID = "other_write";
+
+export const getGuruPortraitSrc = (g: GuruEntry): string | null => g.imagePath?.trim() || null;
+
+/** Legacy guru ids still resolve for existing profiles */
+const legacyGuruAliases: Record<string, string> = {
+  sadhguru: "sadhguru",
+  "art-of-living": "sri-sri",
+  sai: "sai-baba",
+  amma: "other",
+  ramana: "other",
+  iskcon: "iskcon",
+};
+
+export const resolveGuruId = (id: string | null | undefined): string => {
+  const t = id?.trim();
+  if (!t) return "";
+  return legacyGuruAliases[t] ?? t;
 };
 
 export const gurus: GuruEntry[] = [
   {
+    id: "neem-karoli",
+    name: "Neem Karoli Baba",
+    shortLabel: "Neem Karoli",
+    tradition: "Bhakti · Hanuman",
+    lineage: "Ram Dass lineage",
+    bio: "Unconditional love and simple remembrance of the Divine.",
+    imagePath: "/gurus/neem-karoli.jpg",
+  },
+  {
+    id: "bade-mandir-guruji",
+    name: "Bade Mandir Guruji",
+    shortLabel: "Bade Mandir",
+    tradition: "Bhakti · Guru bhakti",
+    lineage: "Shri Ram Sharanam",
+    bio: "Naam, satsang, and humble seva at the feet of the Divine.",
+    imagePath: "/gurus/bade-mandir-guruji.jpg",
+  },
+  {
+    id: "osho",
+    name: "Osho",
+    tradition: "Meditation",
+    lineage: "Contemplative inquiry",
+    bio: "Dynamic and silent meditation as doorways to awareness.",
+    imagePath: "/gurus/osho.jpg",
+  },
+  {
+    id: "krishna",
+    name: "Krishna",
+    tradition: "Bhakti",
+    lineage: "Lila · divine play",
+    bio: "Devotion through naam, leela, and surrender.",
+    imagePath: "/gurus/krishna.jpg",
+  },
+  {
     id: "sadhguru",
     name: "Sadhguru",
     tradition: "Isha Yoga",
-    lineage: "Shiva tradition · classical yoga",
-    bio: "Founder of Isha Foundation; emphasis on inner engineering and consecrated spaces.",
-    imageUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Sadhguru_Jaggi_Vasudev.jpg/200px-Sadhguru_Jaggi_Vasudev.jpg",
-  },
-  {
-    id: "amma",
-    name: "Mata Amritanandamayi",
-    tradition: "Bhakti",
-    lineage: "Sakti path · selfless love",
-    bio: "Embracing the world through hugging and humanitarian seva.",
-  },
-  {
-    id: "art-of-living",
-    name: "Sri Sri Ravi Shankar",
-    tradition: "Art of Living",
-    lineage: "Vedantic insight · Sudarshan Kriya",
-    bio: "Breath-based programs and satsang for peace in society.",
-  },
-  { id: "osho", name: "Osho", tradition: "Meditation", lineage: "Contemplative inquiry", bio: "Dynamic and silent meditation as doorways to awareness." },
-  {
-    id: "radhasoami",
-    name: "Radha Soami tradition",
-    tradition: "Sant Mat · Surat Shabd Yoga",
-    lineage: "Inner sound and light",
-    bio: "Meditation on the inner Word with guidance of the living Master; emphasis on ethical living and devotion.",
+    lineage: "Classical yoga · inner engineering",
+    bio: "Consecrated spaces and disciplined inner work.",
+    imagePath: "/gurus/sadguru.jpg",
   },
   {
     id: "yogananda",
     name: "Paramahansa Yogananda",
+    shortLabel: "Yogananda",
     tradition: "Kriya Yoga",
-    lineage: "Self-Realization Fellowship line",
-    bio: "Kriya as scientific art of God-union.",
+    lineage: "Self-Realization Fellowship",
+    bio: "Kriya as the scientific art of God-union.",
+    imagePath: "/gurus/yogananda.jpg",
   },
-  { id: "sai", name: "Sathya Sai Baba", tradition: "Universal Love", lineage: "Sathya Sai organizations", bio: "Love all, serve all; truth and right conduct." },
   {
-    id: "bade-mandir-guruji",
-    name: "Bade Mandir Guruji",
-    tradition: "Bhakti · Guru bhakti",
-    lineage: "Shri Ram Sharanam lineage (Bade Mandir)",
-    bio: "Guidance rooted in naam, satsang, and humble seva at the feet of the Divine.",
+    id: "sri-sri",
+    name: "Sri Sri Ravi Shankar",
+    shortLabel: "Sri Sri",
+    tradition: "Art of Living",
+    lineage: "Sudarshan Kriya",
+    bio: "Breath, satsang, and peace in society.",
+    imagePath: "/gurus/ravishankar.jpg",
+  },
+  {
+    id: "premanand",
+    name: "Premanand Ji Maharaj",
+    shortLabel: "Premanand",
+    tradition: "Bhakti",
+    lineage: "Krishna bhakti",
+    bio: "Satsang and heart-centered devotion.",
+    imagePath: "/gurus/premanand.jpg",
+  },
+  {
+    id: "sai-baba",
+    name: "Sai Baba",
+    tradition: "Universal love",
+    lineage: "Sathya Sai tradition",
+    bio: "Love all, serve all; truth and right conduct.",
+    imagePath: "/gurus/saibaba.jpg",
+  },
+  {
+    id: "radhasoami",
+    name: "Radha Soami",
+    tradition: "Sant Mat",
+    lineage: "Surat Shabd Yoga",
+    bio: "Inner sound and light with ethical living.",
+  },
+  {
+    id: "other",
+    name: "Other (write)",
+    shortLabel: "Other",
+    tradition: "Your lineage",
+    bio: "A guide or path not listed — honour it in your own words.",
   },
 ];
 
-export const spiritualPaths = [
-  { id: "bhakti", label: "Bhakti" },
-  { id: "kriya", label: "Kriya" },
-  { id: "advaita", label: "Advaita" },
-  { id: "seva", label: "Seva-forward" },
-  { id: "mindfulness", label: "Mindfulness" },
-  { id: "tantra", label: "Tantra (classical)" },
-  { id: "integral", label: "Integral yoga" },
+export type PathOption = { id: string; label: string };
+
+export type SpiritualPathGroup = { group: string; options: PathOption[] };
+
+export const spiritualPathGroups: SpiritualPathGroup[] = [
+  {
+    group: "Core paths",
+    options: [
+      { id: "bhakti", label: "Bhakti" },
+      { id: "kriya", label: "Kriya" },
+      { id: "advaita", label: "Advaita" },
+      { id: "seva", label: "Seva-forward" },
+      { id: "mindfulness", label: "Mindfulness" },
+      { id: "tantra", label: "Tantra (classical)" },
+      { id: "integral", label: "Integral yoga" },
+    ],
+  },
+  {
+    group: "Traditions & affiliations",
+    options: [
+      { id: "advaita_vedanta", label: "Advaita Vedanta (Self-Enquiry)" },
+      { id: "arhatic", label: "Arhatic Yoga / Pranic Healing" },
+      { id: "art_of_living", label: "Art of Living" },
+      { id: "ashtanga", label: "Ashtanga Yoga" },
+      { id: "baps", label: "BAPS" },
+      { id: "buddhism", label: "Buddhism" },
+      { id: "djjs", label: "DJJS" },
+      { id: "ekam", label: "Ekam / Oneness" },
+      { id: "isha_meditator", label: "Isha Meditator" },
+      { id: "iskcon", label: "ISKCON" },
+      { id: "iyengar", label: "Iyengar Yoga" },
+      { id: "oshoite", label: "Oshoite" },
+      { id: "premanand_follower", label: "Premanand Ji Maharaj Follower" },
+      { id: "radhasoami_path", label: "Radha Soami" },
+      { id: "raja_yoga", label: "Raja Yoga / Brahma Kumaris" },
+      { id: "sahaja", label: "Sahaja Yoga" },
+      { id: "samarpan", label: "Samarpan Meditation" },
+      { id: "srf", label: "Self-Realization Fellowship" },
+      { id: "shiv_yog", label: "Shiv Yog" },
+      { id: "sky_yoga", label: "SKY Yoga" },
+      { id: "sufism", label: "Sufism" },
+      { id: "tm", label: "TM" },
+      { id: "vipassana_path", label: "Vipassana" },
+      { id: "yoga_teacher", label: "Yoga Teacher" },
+      { id: OTHER_WRITE_ID, label: "Other (write)" },
+    ],
+  },
 ];
+
+/** Flat list for selects and lookups (includes legacy core paths once). */
+export const spiritualPaths: PathOption[] = spiritualPathGroups.flatMap((g) => g.options);
+
+export const parseSpiritualPathIds = (raw: string | null | undefined): string[] => {
+  if (!raw?.trim()) return [];
+  return [...new Set(raw.split(",").map((s) => s.trim()).filter(Boolean))];
+};
+
+export const serializeSpiritualPathIds = (ids: string[]): string => [...new Set(ids.filter(Boolean))].join(",");
+
+export const formatSpiritualPathsDisplay = (raw: string | null | undefined): string => {
+  const ids = parseSpiritualPathIds(raw);
+  if (!ids.length) return "—";
+  return ids
+    .map((id) => {
+      if (id.startsWith("custom:")) return id.slice(7);
+      return spiritualPaths.find((p) => p.id === id)?.label ?? id;
+    })
+    .join(" · ");
+};
+
+export const ageOptions = Array.from({ length: 63 }, (_, i) => {
+  const age = i + 18;
+  return { value: String(age), label: String(age) };
+});
+
+export const nakshatraOptions = [
+  "Ashwini",
+  "Bharani",
+  "Krittika",
+  "Rohini",
+  "Mrigashira",
+  "Ardra",
+  "Punarvasu",
+  "Pushya",
+  "Ashlesha",
+  "Magha",
+  "Purva Phalguni",
+  "Uttara Phalguni",
+  "Hasta",
+  "Chitra",
+  "Swati",
+  "Vishakha",
+  "Anuradha",
+  "Jyeshtha",
+  "Mula",
+  "Purva Ashadha",
+  "Uttara Ashadha",
+  "Shravana",
+  "Dhanishta",
+  "Shatabhisha",
+  "Purva Bhadrapada",
+  "Uttara Bhadrapada",
+  "Revati",
+].map((n) => ({ id: n.toLowerCase().replace(/\s+/g, "_"), label: n }));
+
+export const occupationOptions = [
+  { id: "student", label: "Student" },
+  { id: "professional", label: "Professional / corporate" },
+  { id: "entrepreneur", label: "Entrepreneur" },
+  { id: "healthcare", label: "Healthcare" },
+  { id: "education", label: "Education" },
+  { id: "creative", label: "Creative / arts" },
+  { id: "wellness", label: "Wellness / yoga teacher" },
+  { id: "homemaker", label: "Homemaker" },
+  { id: "retired", label: "Retired" },
+  { id: "spiritual_worker", label: "Spiritual / seva full-time" },
+  { id: OTHER_WRITE_ID, label: "Other (write)" },
+];
+
+export const customListId = (text: string) => `custom:${text.trim()}`;
+
+export const labelForListId = (options: { id: string; label: string }[], id: string) => {
+  if (id.startsWith("custom:")) return id.slice(7);
+  return options.find((o) => o.id === id)?.label ?? id;
+};
 
 export const sadhanaFrequencies = [
   { id: "daily_twice", label: "Twice daily" },
@@ -91,6 +274,7 @@ export const programsUndergone = [
   { id: "retreat_silent", label: "Silent retreat (7+ days)" },
   { id: "kriya_init", label: "Kriya initiation" },
   { id: "ytt", label: "Yoga teacher training" },
+  { id: OTHER_WRITE_ID, label: "Other (write)" },
 ];
 
 export const meditationExperiences = [
@@ -117,10 +301,10 @@ export const marriageTimelines = [
 ];
 
 export const maritalStatuses = [
-  { id: "never", label: "Never married" },
-  { id: "divorced", label: "Divorced" },
-  { id: "widowed", label: "Widowed" },
-  { id: "separated", label: "Separated" },
+  { id: "never", label: "Not yet married" },
+  { id: "divorced", label: "Previously married · divorced" },
+  { id: "widowed", label: "Widowed · open to companionship" },
+  { id: "separated", label: "Separated · discerning next chapter" },
 ];
 
 export const childrenPreferences = [
@@ -213,6 +397,7 @@ export const practices = [
   { id: "vegetarian", label: "Vegetarian" },
   { id: "journaling", label: "Journaling" },
   { id: "scripture", label: "Scripture Study" },
+  { id: OTHER_WRITE_ID, label: "Other (write)" },
 ];
 
 export const dietOptions = [
@@ -245,3 +430,49 @@ export const callPreferences = [
 
 export const optionLabel = (options: { id: string; label: string }[], id: string | null | undefined) =>
   options.find((x) => x.id === id)?.label ?? "—";
+
+export const listIdsForUi = (ids: string[]) => {
+  const hasCustom = ids.some((id) => id.startsWith("custom:"));
+  const base = ids.filter((id) => !id.startsWith("custom:"));
+  return hasCustom ? [...base, OTHER_WRITE_ID] : base;
+};
+
+export const extractCustomFromList = (ids: string[]) => {
+  const custom = ids.find((id) => id.startsWith("custom:"));
+  return custom ? custom.slice(7) : "";
+};
+
+export const commitCustomToList = (ids: string[], customText: string) => {
+  const base = ids.filter((id) => id !== OTHER_WRITE_ID && !id.startsWith("custom:"));
+  const t = customText.trim();
+  if (ids.includes(OTHER_WRITE_ID) && t) return [...base, customListId(t)];
+  return base;
+};
+
+export const guruDisplayName = (guruId: string | null | undefined, notes?: string | null) => {
+  const id = resolveGuruId(guruId);
+  if (!id) return "—";
+  if (id === "other" && notes?.trim()) return notes.trim();
+  return gurus.find((g) => g.id === id)?.name ?? guruId ?? "—";
+};
+
+export const occupationLabel = (raw: string | null | undefined) => {
+  if (!raw?.trim()) return "—";
+  if (raw.startsWith("custom:")) return raw.slice(7);
+  return occupationOptions.find((o) => o.id === raw)?.label ?? raw;
+};
+
+export const serializeSpiritualPathWithOther = (ids: string[], otherText: string) => {
+  const base = ids.filter((id) => id !== OTHER_WRITE_ID && !id.startsWith("custom:"));
+  const t = otherText.trim();
+  const withCustom = ids.includes(OTHER_WRITE_ID) && t ? [...base, customListId(t)] : base;
+  return serializeSpiritualPathIds(withCustom);
+};
+
+export const parseSpiritualPathForUi = (raw: string | null | undefined) => {
+  const ids = parseSpiritualPathIds(raw);
+  return {
+    ids: listIdsForUi(ids),
+    otherText: extractCustomFromList(ids),
+  };
+};

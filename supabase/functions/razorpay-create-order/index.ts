@@ -6,13 +6,27 @@ type CreateOrderBody = {
   plan?: string;
 };
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
 const json = (status: number, data: unknown) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...corsHeaders,
+    },
   });
 
 Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   if (req.method !== "POST") {
     return json(405, { error: "Method not allowed" });
   }
@@ -26,14 +40,21 @@ Deno.serve(async (req) => {
   }
 
   const authHeader = req.headers.get("Authorization");
+
   if (!authHeader) {
     return json(401, { error: "Unauthorized" });
   }
 
   const token = authHeader.replace("Bearer ", "");
+
   const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authHeader } },
+    global: {
+      headers: {
+        Authorization: authHeader,
+      },
+    },
   });
+
   const {
     data: { user },
     error: authError,
@@ -44,9 +65,13 @@ Deno.serve(async (req) => {
   }
 
   const body = (await req.json()) as CreateOrderBody;
+
   const amount = Number(body.amount);
   const currency = body.currency ?? "INR";
-  const plan = typeof body.plan === "string" && body.plan.trim() ? body.plan.trim() : "sacred";
+  const plan =
+    typeof body.plan === "string" && body.plan.trim()
+      ? body.plan.trim()
+      : "sacred";
 
   if (!Number.isFinite(amount) || amount <= 0) {
     return json(400, { error: "Invalid amount" });
@@ -57,12 +82,22 @@ Deno.serve(async (req) => {
 
   if (serviceRoleKey) {
     const admin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
     });
-    const { data: cfg } = await admin.from("razorpay_config").select("key_id,key_secret").eq("id", 1).maybeSingle();
+
+    const { data: cfg } = await admin
+      .from("razorpay_config")
+      .select("key_id,key_secret")
+      .eq("id", 1)
+      .maybeSingle();
+
     if (cfg?.key_id?.trim()) {
       keyId = cfg.key_id.trim();
     }
+
     if (cfg?.key_secret?.trim()) {
       keySecret = cfg.key_secret.trim();
     }
@@ -71,11 +106,12 @@ Deno.serve(async (req) => {
   if (!keyId || !keySecret) {
     return json(500, {
       error:
-        "Razorpay keys missing. Save Key ID and Secret in Admin → Razorpay, or set RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET on the Edge Function.",
+        "Razorpay keys missing. Save Key ID and Secret in Admin → Razorpay.",
     });
   }
 
   const credentials = btoa(`${keyId}:${keySecret}`);
+
   const response = await fetch("https://api.razorpay.com/v1/orders", {
     method: "POST",
     headers: {
@@ -85,14 +121,22 @@ Deno.serve(async (req) => {
     body: JSON.stringify({
       amount,
       currency,
-      receipt: `${user.id}-${Date.now()}`,
-      notes: { user_id: user.id, plan },
+      receipt: `aatma_${Date.now()}`,
+      notes: {
+        user_id: user.id,
+        plan,
+      },
     }),
   });
 
   const payload = await response.json();
+  console.log("RAZORPAY RESPONSE:", payload);
+
   if (!response.ok) {
-    return json(400, { error: payload?.error?.description ?? "Failed to create order" });
+    return json(400, {
+      error:
+        payload?.error?.description ?? "Failed to create Razorpay order",
+    });
   }
 
   return json(200, {

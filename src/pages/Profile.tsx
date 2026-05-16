@@ -16,6 +16,7 @@ import {
   getProfileAge,
   getProfileCity,
   getProfilePhotoUrl,
+  getProfilePhotoUrls,
   type UserProfile,
   type UserProfileWithCompatibility,
 } from "@/lib/db";
@@ -25,30 +26,47 @@ import { checkMutualMatch, hasUserLiked, likeUser, rejectIncomingRequest } from 
 import { signOutUser } from "@/lib/auth";
 import { updateUserProfile } from "@/lib/profile";
 import { uploadProfileImage } from "@/lib/profileStorage";
+import { SpiritualEssencePicker } from "@/components/profile/SpiritualEssencePicker";
+import { ChipMultiSelect } from "@/components/profile/ChipMultiSelect";
+import { ProfilePhotoGallery } from "@/components/profile/ProfilePhotoGallery";
 import {
+  ageOptions,
   callPreferences,
   childrenPreferences,
+  commitCustomToList,
   dailyRhythmOptions,
   dietOptions,
   drinkingHabits,
   educationLevels,
+  extractCustomFromList,
   familyOrientations,
+  formatSpiritualPathsDisplay,
+  getGuruPortraitSrc,
   gurus,
+  guruDisplayName,
   incomeRanges,
   languageOptions,
   lifestyleOptions,
+  listIdsForUi,
   maritalStatuses,
   marriageTimelines,
   meditationExperiences,
+  nakshatraOptions,
+  occupationLabel,
+  occupationOptions,
   optionLabel,
+  OTHER_WRITE_ID,
+  parseSpiritualPathForUi,
   practices as practiceOptions,
   programsUndergone,
   relocationOptions,
   religionOptions,
+  resolveGuruId,
   sadhanaFrequencies,
   sevaInclinations,
+  serializeSpiritualPathWithOther,
   smokingHabits,
-  spiritualPaths,
+  spiritualPathGroups,
   spiritualValues,
 } from "@/lib/onboardingOptions";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -57,13 +75,6 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 
 const practiceLabel = (id: string) => practiceOptions.find((p) => p.id === id)?.label ?? id;
-
-const guruDisplayName = (guruId: string | null) => {
-  if (!guruId) {
-    return "Spiritual path";
-  }
-  return gurus.find((g) => g.id === guruId)?.name ?? guruId;
-};
 
 const Profile = () => {
   const nav = useNavigate();
@@ -83,7 +94,17 @@ const Profile = () => {
   const [editDiet, setEditDiet] = useState("");
   const [editLifestyle, setEditLifestyle] = useState("");
   const [editPractices, setEditPractices] = useState<string[]>([]);
-  const [editSpiritualPath, setEditSpiritualPath] = useState("");
+  const [editSpiritualPathIds, setEditSpiritualPathIds] = useState<string[]>([]);
+  const [editSpiritualPathOther, setEditSpiritualPathOther] = useState("");
+  const [editGuruOther, setEditGuruOther] = useState("");
+  const [editPracticesOther, setEditPracticesOther] = useState("");
+  const [editProgramsOther, setEditProgramsOther] = useState("");
+  const [editBirthDate, setEditBirthDate] = useState("");
+  const [editBirthTime, setEditBirthTime] = useState("");
+  const [editBirthPlace, setEditBirthPlace] = useState("");
+  const [editOccupation, setEditOccupation] = useState("");
+  const [editOccupationOther, setEditOccupationOther] = useState("");
+  const [occupationQuery, setOccupationQuery] = useState("");
   const [editPrograms, setEditPrograms] = useState<string[]>([]);
   const [editSadhana, setEditSadhana] = useState("");
   const [editValues, setEditValues] = useState<string[]>([]);
@@ -104,7 +125,6 @@ const Profile = () => {
   const [editCaste, setEditCaste] = useState("");
   const [editNakshatra, setEditNakshatra] = useState("");
   const [editGothram, setEditGothram] = useState("");
-  const [editOccupation, setEditOccupation] = useState("");
   const [editEducation, setEditEducation] = useState("");
   const [editIncome, setEditIncome] = useState("");
   const [editHeightCm, setEditHeightCm] = useState("");
@@ -140,12 +160,28 @@ const Profile = () => {
     setEditAge(me.age != null ? String(me.age) : "");
     setEditCity(me.city ?? "");
     setEditBio(me.bio ?? "");
-    setEditGuru(me.guru ?? "");
+    setEditGuru(resolveGuruId(me.guru));
+    setEditGuruOther(resolveGuruId(me.guru) === "other" ? (me.guru_notes ?? "") : "");
     setEditDiet(me.diet ?? "");
     setEditLifestyle(me.lifestyle ?? "");
-    setEditPractices([...me.practices]);
-    setEditSpiritualPath(me.spiritual_path ?? "");
-    setEditPrograms([...me.programs_undergone]);
+    setEditPractices(listIdsForUi(me.practices));
+    setEditPracticesOther(extractCustomFromList(me.practices));
+    const pathUi = parseSpiritualPathForUi(me.spiritual_path);
+    setEditSpiritualPathIds(pathUi.ids);
+    setEditSpiritualPathOther(pathUi.otherText);
+    setEditPrograms(listIdsForUi(me.programs_undergone));
+    setEditProgramsOther(extractCustomFromList(me.programs_undergone));
+    setEditBirthDate(me.birth_date ?? "");
+    setEditBirthTime(me.birth_time ?? "");
+    setEditBirthPlace(me.birth_place ?? "");
+    const occ = me.occupation ?? "";
+    if (occ.startsWith("custom:")) {
+      setEditOccupation(OTHER_WRITE_ID);
+      setEditOccupationOther(occ.slice(7));
+    } else {
+      setEditOccupation(occ);
+      setEditOccupationOther("");
+    }
     setEditSadhana(me.sadhana_frequency ?? "");
     setEditValues([...me.spiritual_values]);
     setEditMeditation(me.meditation_experience ?? "");
@@ -165,7 +201,6 @@ const Profile = () => {
     setEditCaste(me.caste ?? "");
     setEditNakshatra(me.nakshatra ?? "");
     setEditGothram(me.gothram ?? "");
-    setEditOccupation(me.occupation ?? "");
     setEditEducation(me.education ?? "");
     setEditIncome(me.income_range ?? "");
     setEditHeightCm(me.height_cm != null ? String(me.height_cm) : "");
@@ -201,7 +236,8 @@ const Profile = () => {
       location: getProfileCity(otherProfile),
       photo: getProfilePhotoUrl(otherProfile),
       compatibility,
-      guru: guruDisplayName(otherProfile.guru),
+      guru: guruDisplayName(otherProfile.guru, otherProfile.guru_notes),
+      photos: getProfilePhotoUrls(otherProfile),
       practice: practiceLabel(getPrimaryPractice(otherProfile.practices)),
       diet: optionLabel(dietOptions, otherProfile.diet),
       lifestyle: optionLabel(lifestyleOptions, otherProfile.lifestyle),
@@ -249,12 +285,6 @@ const Profile = () => {
       cancelled = true;
     };
   }, [isMutualMatched, me?.id, id]);
-
-  const togglePractice = (practiceId: string) => {
-    setEditPractices((prev) =>
-      prev.includes(practiceId) ? prev.filter((x) => x !== practiceId) : [...prev, practiceId]
-    );
-  };
 
   const toggleInList = (id: string, list: string[], setList: (v: string[]) => void) => {
     setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
@@ -395,14 +425,29 @@ const Profile = () => {
       guru: editGuru || null,
       diet: editDiet || null,
       lifestyle: editLifestyle || null,
-      practices: editPractices,
-      spiritual_path: editSpiritualPath || null,
-      programs_undergone: editPrograms,
+      spiritual_path:
+        editSpiritualPathIds.length > 0
+          ? serializeSpiritualPathWithOther(editSpiritualPathIds, editSpiritualPathOther)
+          : null,
+      practices: commitCustomToList(editPractices, editPracticesOther),
+      programs_undergone: commitCustomToList(editPrograms, editProgramsOther),
+      guru_notes:
+        editGuru === "other"
+          ? editGuruOther.trim() || editGuruNotes.trim() || null
+          : editGuruNotes.trim() || null,
+      birth_date: editBirthDate.trim() || null,
+      birth_time: editBirthTime.trim() || null,
+      birth_place: editBirthPlace.trim() || null,
+      occupation:
+        editOccupation === OTHER_WRITE_ID
+          ? editOccupationOther.trim()
+            ? `custom:${editOccupationOther.trim()}`
+            : null
+          : editOccupation.trim() || null,
       sadhana_frequency: editSadhana || null,
       spiritual_values: editValues,
       meditation_experience: editMeditation || null,
       seva_inclination: editSeva || null,
-      guru_notes: editGuruNotes.trim() || null,
       guru_photo_url: editGuruPhotoUrl.trim() || null,
       marriage_timeline: editMarriageTimeline || null,
       marital_status: editMaritalStatus || null,
@@ -417,7 +462,6 @@ const Profile = () => {
       caste: editCaste.trim() || null,
       nakshatra: editNakshatra.trim() || null,
       gothram: editGothram.trim() || null,
-      occupation: editOccupation.trim() || null,
       education: editEducation || null,
       income_range: editIncome || null,
       height_cm,
@@ -556,7 +600,7 @@ const Profile = () => {
 
   const ownPhotoSrc = me ? getProfilePhotoUrl(me) : "";
   const ownGuruMeta = editGuru ? gurus.find((g) => g.id === editGuru) : undefined;
-  const ownGuruPortrait = editGuruPhotoUrl.trim() || ownGuruMeta?.imageUrl?.trim() || "";
+  const ownGuruPortrait = editGuruPhotoUrl.trim() || (ownGuruMeta ? getGuruPortraitSrc(ownGuruMeta) : "") || "";
 
   return (
     <div className="animate-fade-in pb-8">
@@ -657,14 +701,19 @@ const Profile = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="profile-age">Age</Label>
-                  <Input
+                  <select
                     id="profile-age"
-                    inputMode="numeric"
                     value={editAge}
                     onChange={(e) => setEditAge(e.target.value)}
-                    placeholder="Optional"
-                    className="h-12 bg-card border-border/60"
-                  />
+                    className={selectClass}
+                  >
+                    <option value="">—</option>
+                    {ageOptions.map((a) => (
+                      <option key={a.value} value={a.value}>
+                        {a.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="profile-city">City</Label>
@@ -692,17 +741,13 @@ const Profile = () => {
                 <AccordionItem value="essence" className="border border-border/50 rounded-2xl px-3 bg-card/25">
                   <AccordionTrigger className="text-sm py-3 hover:no-underline">Spiritual Essence</AccordionTrigger>
                   <AccordionContent className="space-y-4 pb-3">
-                    <div className="space-y-2">
-                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Guru</p>
-                      <select value={editGuru} onChange={(e) => setEditGuru(e.target.value)} className={selectClass}>
-                        <option value="">Choose guru</option>
-                        {gurus.map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <SpiritualEssencePicker
+                      gurus={gurus}
+                      value={editGuru}
+                      onChange={setEditGuru}
+                      otherName={editGuruOther}
+                      onOtherNameChange={setEditGuruOther}
+                    />
                     {ownGuruMeta ? (
                       <div className="flex gap-3 items-start rounded-xl border border-border/40 bg-background/40 p-3">
                         {ownGuruPortrait ? (
@@ -751,60 +796,34 @@ const Profile = () => {
                     </div>
                     <div className="space-y-2">
                       <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Spiritual path</p>
-                      <select
-                        value={editSpiritualPath}
-                        onChange={(e) => setEditSpiritualPath(e.target.value)}
-                        className={selectClass}
-                      >
-                        <option value="">Choose path</option>
-                        {spiritualPaths.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </select>
+                      <ChipMultiSelect
+                        groups={spiritualPathGroups}
+                        value={editSpiritualPathIds}
+                        onChange={setEditSpiritualPathIds}
+                        otherText={editSpiritualPathOther}
+                        onOtherTextChange={setEditSpiritualPathOther}
+                        searchPlaceholder="Search paths…"
+                      />
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">Daily practices</p>
-                      <div className="flex flex-wrap gap-2">
-                        {practiceOptions.map((p) => {
-                          const sel = editPractices.includes(p.id);
-                          return (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => togglePractice(p.id)}
-                              className={cn(
-                                "px-3 py-2 rounded-full border text-xs font-medium transition-all",
-                                sel ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border/60 hover:border-primary/40"
-                              )}
-                            >
-                              {p.label}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <ChipMultiSelect
+                        options={practiceOptions}
+                        value={editPractices}
+                        onChange={setEditPractices}
+                        otherText={editPracticesOther}
+                        onOtherTextChange={setEditPracticesOther}
+                      />
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">Programs undergone</p>
-                      <div className="flex flex-wrap gap-2">
-                        {programsUndergone.map((p) => {
-                          const sel = editPrograms.includes(p.id);
-                          return (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => toggleInList(p.id, editPrograms, setEditPrograms)}
-                              className={cn(
-                                "px-3 py-2 rounded-full border text-xs font-medium transition-all",
-                                sel ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border/60 hover:border-primary/40"
-                              )}
-                            >
-                              {p.label}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <ChipMultiSelect
+                        options={programsUndergone}
+                        value={editPrograms}
+                        onChange={setEditPrograms}
+                        otherText={editProgramsOther}
+                        onOtherTextChange={setEditProgramsOther}
+                      />
                     </div>
                     <div className="space-y-2">
                       <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Sadhana frequency</p>
@@ -1056,10 +1075,53 @@ const Profile = () => {
                         <Label htmlFor="nakshatra" className="text-[11px] uppercase tracking-wider text-muted-foreground">
                           Nakshatra
                         </Label>
-                        <Input
+                        <select
                           id="nakshatra"
                           value={editNakshatra}
                           onChange={(e) => setEditNakshatra(e.target.value)}
+                          className={selectClass}
+                        >
+                          <option value="">—</option>
+                          {nakshatraOptions.map((n) => (
+                            <option key={n.id} value={n.id}>
+                              {n.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="birth-date" className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                          Birth date
+                        </Label>
+                        <Input
+                          id="birth-date"
+                          type="date"
+                          value={editBirthDate}
+                          onChange={(e) => setEditBirthDate(e.target.value)}
+                          className="h-10 bg-card border-border/60 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="birth-time" className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                          Birth time
+                        </Label>
+                        <Input
+                          id="birth-time"
+                          type="time"
+                          value={editBirthTime}
+                          onChange={(e) => setEditBirthTime(e.target.value)}
+                          className="h-10 bg-card border-border/60 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="birth-place" className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                          Birth place
+                        </Label>
+                        <Input
+                          id="birth-place"
+                          value={editBirthPlace}
+                          onChange={(e) => setEditBirthPlace(e.target.value)}
+                          placeholder="City or town"
                           className="h-10 bg-card border-border/60 text-sm"
                         />
                       </div>
@@ -1088,11 +1150,38 @@ const Profile = () => {
                         Occupation
                       </Label>
                       <Input
+                        value={occupationQuery}
+                        onChange={(e) => setOccupationQuery(e.target.value)}
+                        placeholder="Search occupation…"
+                        className="h-10 bg-card border-border/60 text-sm"
+                      />
+                      <select
                         id="occupation"
                         value={editOccupation}
                         onChange={(e) => setEditOccupation(e.target.value)}
-                        className="h-10 bg-card border-border/60 text-sm"
-                      />
+                        className={selectClass}
+                      >
+                        <option value="">—</option>
+                        {occupationOptions
+                          .filter(
+                            (o) =>
+                              !occupationQuery.trim() ||
+                              o.label.toLowerCase().includes(occupationQuery.trim().toLowerCase())
+                          )
+                          .map((o) => (
+                            <option key={o.id} value={o.id}>
+                              {o.label}
+                            </option>
+                          ))}
+                      </select>
+                      {editOccupation === OTHER_WRITE_ID ? (
+                        <Input
+                          value={editOccupationOther}
+                          onChange={(e) => setEditOccupationOther(e.target.value)}
+                          placeholder="Your occupation"
+                          className="h-10 bg-card border-border/60 text-sm"
+                        />
+                      ) : null}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-2">
@@ -1207,7 +1296,7 @@ const Profile = () => {
       {!isOwn && profile && otherProfile && (
         <>
           <div className="relative aspect-[4/5]">
-            <img src={profile.photo} alt={profile.name} className="absolute inset-0 h-full w-full object-cover" />
+            <ProfilePhotoGallery photos={profile.photos} alt={profile.name} className="absolute inset-0" />
             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-black/20" />
             <Link to="/app/matches" className="absolute top-6 left-5 h-10 w-10 rounded-full bg-background/80 backdrop-blur grid place-items-center">
               <ArrowLeft className="h-4 w-4" />
@@ -1258,8 +1347,10 @@ const Profile = () => {
               <p className="font-serif italic text-lg mt-4 leading-snug text-foreground/90">"{profile.bio}"</p>
 
               {(() => {
-                const gm = otherProfile.guru ? gurus.find((g) => g.id === otherProfile.guru) : undefined;
-                const portrait = otherProfile.guru_photo_url?.trim() || gm?.imageUrl?.trim() || "";
+                const gm = otherProfile.guru
+                  ? gurus.find((g) => g.id === resolveGuruId(otherProfile.guru))
+                  : undefined;
+                const portrait = otherProfile.guru_photo_url?.trim() || (gm ? getGuruPortraitSrc(gm) : "") || "";
                 return gm || portrait ? (
                   <div className="mt-5 flex gap-3 items-start rounded-xl border border-border/40 bg-card/30 p-3">
                     {portrait ? (
@@ -1279,7 +1370,7 @@ const Profile = () => {
               })()}
 
               <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-                <Field label="Path" value={optionLabel(spiritualPaths, otherProfile.spiritual_path)} />
+                <Field label="Path" value={formatSpiritualPathsDisplay(otherProfile.spiritual_path)} />
                 <Field label="Primary practice" value={profile.practice} />
                 <Field label="Diet" value={profile.diet} />
                 <Field label="Lifestyle" value={profile.lifestyle} />
@@ -1344,7 +1435,7 @@ const Profile = () => {
                   <AccordionContent className="space-y-2 pb-3 text-sm">
                     <Field label="Religion" value={optionLabel(religionOptions, otherProfile.religion)} />
                     <Field label="Caste" value={otherProfile.caste?.trim() || "—"} />
-                    <Field label="Nakshatra" value={otherProfile.nakshatra?.trim() || "—"} />
+                    <Field label="Nakshatra" value={optionLabel(nakshatraOptions, otherProfile.nakshatra)} />
                     <Field label="Gothram" value={otherProfile.gothram?.trim() || "—"} />
                   </AccordionContent>
                 </AccordionItem>
@@ -1353,7 +1444,7 @@ const Profile = () => {
                     Earthly identity <span className="text-[10px] font-normal normal-case">(optional)</span>
                   </AccordionTrigger>
                   <AccordionContent className="space-y-2 pb-3 text-sm">
-                    <Field label="Occupation" value={otherProfile.occupation?.trim() || "—"} />
+                    <Field label="Occupation" value={occupationLabel(otherProfile.occupation)} />
                     <Field label="Education" value={optionLabel(educationLevels, otherProfile.education)} />
                     <Field label="Income" value={optionLabel(incomeRanges, otherProfile.income_range)} />
                     <Field
