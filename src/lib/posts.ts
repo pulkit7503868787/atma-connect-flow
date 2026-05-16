@@ -2,13 +2,14 @@ import { supabase } from "@/lib/supabaseClient";
 import { getDisplayName, getProfilePhotoUrl, type UserProfile } from "@/lib/db";
 import { getCommunityPostImagePublicUrl } from "@/lib/postStorage";
 
-export type PostCategory = "reflection" | "satsang_experience" | "meditation_audio" | "teaching";
+/** Stored on `posts.category`. Legacy `teaching` rows are read as `meditation_audio`. */
+export type PostCategory = "reflection" | "satsang_experience" | "meditation_audio" | "gathering_invitation";
 
 export const POST_CATEGORY_LABELS: Record<PostCategory, string> = {
-  reflection: "Reflection",
-  satsang_experience: "Satsang & experience sharing",
-  meditation_audio: "Meditation audio",
-  teaching: "Teaching",
+  reflection: "Post",
+  satsang_experience: "Satsang / Experience Sharing",
+  meditation_audio: "Sadhana / Yoga / Teaching updates",
+  gathering_invitation: "Event / Gathering invitation",
 };
 
 export type Post = {
@@ -32,6 +33,11 @@ export type Post = {
   author_avatar: string;
   liked_by_me: boolean;
 };
+
+/** Event block + cover: new gatherings, or older `satsang_experience` rows that still carry event fields. */
+export const postUsesGatheringFields = (p: Pick<Post, "category" | "event_title" | "event_starts_at">): boolean =>
+  p.category === "gathering_invitation" ||
+  (p.category === "satsang_experience" && (Boolean(p.event_title?.trim()) || Boolean(p.event_starts_at)));
 
 export type PostComment = {
   id: string;
@@ -75,9 +81,10 @@ const parseCategory = (v: string | null | undefined): PostCategory => {
     reflection: "reflection",
     satsang_experience: "satsang_experience",
     meditation_audio: "meditation_audio",
-    teaching: "teaching",
+    gathering_invitation: "gathering_invitation",
+    teaching: "meditation_audio",
     satsang: "satsang_experience",
-    event: "satsang_experience",
+    event: "gathering_invitation",
     chanting: "reflection",
   };
   if (v && legacyMap[v]) {

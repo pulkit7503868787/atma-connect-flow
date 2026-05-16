@@ -17,6 +17,7 @@ import {
   LayoutGrid,
   UserRound,
   EyeOff,
+  UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,6 +31,7 @@ import {
   getPostLikeSnapshot,
   POST_CATEGORY_LABELS,
   hidePostsFromAuthor,
+  postUsesGatheringFields,
   type Post,
   type PostComment,
   type PostCategory,
@@ -39,7 +41,7 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabaseClient";
 import { cn } from "@/lib/utils";
 
-const CATEGORIES: PostCategory[] = ["reflection", "satsang_experience", "meditation_audio", "teaching"];
+const CATEGORIES: PostCategory[] = ["reflection", "satsang_experience", "gathering_invitation", "meditation_audio"];
 
 const Community = () => {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -125,7 +127,7 @@ const Community = () => {
   };
 
   const handleShare = async () => {
-    const needsEventMeta = category === "satsang_experience";
+    const needsEventMeta = category === "gathering_invitation";
     if (needsEventMeta && (!eventTitle.trim() || !eventStartsAt)) {
       toast.error("Please add a title and date for this gathering.");
       return;
@@ -137,7 +139,7 @@ const Community = () => {
       !audioFile &&
       !videoFile
     ) {
-      toast.error("Share a reflection or attach gentle media.");
+      toast.error("Share a post or attach gentle media.");
       return;
     }
 
@@ -333,7 +335,7 @@ const Community = () => {
     }
   };
 
-  const showEventFields = category === "satsang_experience";
+  const showEventFields = category === "gathering_invitation";
 
   const canSubmitShare =
     showEventFields
@@ -358,10 +360,10 @@ const Community = () => {
       />
 
       <div className="px-5 space-y-6">
-        {loading && <p className="text-sm text-muted-foreground">Gathering reflections…</p>}
+        {loading && <p className="text-sm text-muted-foreground">Gathering posts…</p>}
         {!loading && posts.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-12 leading-relaxed">
-            The sangha is listening. When you are ready, share a reflection or a gathering.
+            The sangha is listening. When you are ready, share a post or an invitation.
           </p>
         )}
         {posts.map((p, i) => (
@@ -370,41 +372,59 @@ const Community = () => {
             className="glass-card rounded-2xl p-5 border border-border/40 shadow-soft"
             style={{ animationDelay: `${i * 0.04}s` }}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <img src={p.author_avatar} alt="" loading="lazy" className="h-11 w-11 rounded-full object-cover shrink-0" />
-                <div className="min-w-0">
-                  <p className="font-medium truncate">{p.author_name}</p>
-                  <p className="text-xs text-muted-foreground">{timeAgo(p.created_at)}</p>
+            <div className="flex gap-3 items-start">
+              <img
+                src={p.author_avatar}
+                alt=""
+                loading="lazy"
+                className="h-11 w-11 rounded-full object-cover shrink-0 ring-1 ring-border/40"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1 pr-1">
+                    <p className="font-medium text-[15px] leading-snug text-foreground break-words">{p.author_name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{timeAgo(p.created_at)}</p>
+                  </div>
+                  <span
+                    className="shrink-0 max-w-[38%] sm:max-w-[10rem] truncate text-right text-[9px] sm:text-[10px] uppercase tracking-[0.14em] text-primary/85 px-2 py-1 rounded-full bg-primary/8 border border-primary/10 leading-tight"
+                    title={POST_CATEGORY_LABELS[p.category]}
+                  >
+                    {POST_CATEGORY_LABELS[p.category]}
+                  </span>
                 </div>
-              </div>
-              <div className="flex flex-col items-end gap-2 shrink-0">
-                <span className="text-[10px] uppercase tracking-[0.2em] text-primary/80 px-2.5 py-1 rounded-full bg-primary/8 border border-primary/10">
-                  {POST_CATEGORY_LABELS[p.category]}
-                </span>
                 {currentUserId && p.user_id !== currentUserId ? (
-                  <div className="flex flex-wrap justify-end gap-2">
+                  <div className="flex justify-end gap-1 mt-2.5">
                     <Link
                       to={`/app/profile/${p.user_id}`}
-                      className="text-[11px] font-medium text-primary hover:underline inline-flex items-center gap-1"
+                      title="Profile"
+                      className="h-9 w-9 rounded-full border border-border/50 bg-card/80 text-muted-foreground hover:text-primary hover:border-primary/30 grid place-items-center transition-colors"
                     >
-                      <UserRound className="h-3 w-3" />
-                      Profile & connect
+                      <UserRound className="h-4 w-4" aria-hidden />
+                      <span className="sr-only">Profile</span>
+                    </Link>
+                    <Link
+                      to={`/app/profile/${p.user_id}`}
+                      title="Connect"
+                      className="h-9 w-9 rounded-full border border-border/50 bg-card/80 text-muted-foreground hover:text-primary hover:border-primary/30 grid place-items-center transition-colors"
+                    >
+                      <UserPlus className="h-4 w-4" aria-hidden />
+                      <span className="sr-only">Connect</span>
                     </Link>
                     <button
                       type="button"
+                      title="Hide from feed"
                       onClick={() => void handleHideAuthor(p.user_id)}
-                      className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                      className="h-9 w-9 rounded-full border border-border/40 bg-card/60 text-muted-foreground hover:text-foreground hover:bg-secondary/60 grid place-items-center transition-colors"
                     >
-                      <EyeOff className="h-3 w-3" />
-                      Hide from feed
+                      <EyeOff className="h-4 w-4" aria-hidden />
+                      <span className="sr-only">Hide from feed</span>
                     </button>
                   </div>
                 ) : null}
               </div>
             </div>
 
-            {(p.category === "satsang_experience") && (p.event_title || p.event_starts_at) && (
+            {postUsesGatheringFields(p) && (p.event_title || p.event_starts_at) && (
               <div className="mt-4 rounded-2xl border border-primary/12 bg-secondary/30 px-4 py-3 space-y-2 text-sm">
                 {p.cover_image_url ? (
                   <img src={p.cover_image_url} alt="" className="w-full max-h-40 rounded-xl object-cover mb-2" loading="lazy" />
@@ -436,7 +456,7 @@ const Community = () => {
               </div>
             )}
 
-            {p.cover_image_url && p.category !== "satsang_experience" ? (
+            {p.cover_image_url && !postUsesGatheringFields(p) ? (
               <img src={p.cover_image_url} alt="" loading="lazy" className="mt-4 w-full max-h-48 rounded-xl object-cover" />
             ) : null}
 
