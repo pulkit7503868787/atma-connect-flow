@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import type { SpiritualPathGroup } from "@/lib/onboardingOptions";
@@ -11,9 +11,9 @@ type ChipMultiSelectProps = {
   options?: ChipOption[];
   value: string[];
   onChange: (ids: string[]) => void;
-  searchPlaceholder?: string;
   otherText?: string;
   onOtherTextChange?: (text: string) => void;
+  otherPlaceholder?: string;
   className?: string;
 };
 
@@ -22,14 +22,11 @@ export const ChipMultiSelect = ({
   options,
   value,
   onChange,
-  searchPlaceholder = "Search…",
   otherText = "",
   onOtherTextChange,
+  otherPlaceholder = "Share in your own words",
   className,
 }: ChipMultiSelectProps) => {
-  const [query, setQuery] = useState("");
-  const q = query.trim().toLowerCase();
-
   const flatOptions = useMemo(() => {
     if (groups?.length) {
       return groups.flatMap((g) => g.options.map((o) => ({ ...o, group: g.group })));
@@ -37,21 +34,10 @@ export const ChipMultiSelect = ({
     return (options ?? []).map((o) => ({ ...o, group: "" }));
   }, [groups, options]);
 
-  const filtered = useMemo(() => {
-    if (!q) return flatOptions;
-    return flatOptions.filter((o) => o.label.toLowerCase().includes(q) || o.group.toLowerCase().includes(q));
-  }, [flatOptions, q]);
-
-  const filteredGroups = useMemo(() => {
+  const grouped = useMemo(() => {
     if (!groups?.length) return null;
-    const byGroup = new Map<string, ChipOption[]>();
-    for (const o of filtered) {
-      const list = byGroup.get(o.group) ?? [];
-      list.push({ id: o.id, label: o.label });
-      byGroup.set(o.group, list);
-    }
-    return [...byGroup.entries()].map(([group, opts]) => ({ group, options: opts }));
-  }, [filtered, groups]);
+    return groups.map((g) => ({ group: g.group, options: g.options }));
+  }, [groups]);
 
   const toggle = (id: string) => {
     onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
@@ -80,17 +66,8 @@ export const ChipMultiSelect = ({
 
   return (
     <div className={cn("space-y-3", className)}>
-      {flatOptions.length > 8 ? (
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={searchPlaceholder}
-          className="h-10 bg-card border-border/60 text-sm"
-        />
-      ) : null}
-
-      {filteredGroups
-        ? filteredGroups.map(({ group, options: opts }) =>
+      {grouped
+        ? grouped.map(({ group, options: opts }) =>
             opts.length ? (
               <div key={group} className="space-y-2">
                 <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{group}</p>
@@ -98,13 +75,13 @@ export const ChipMultiSelect = ({
               </div>
             ) : null
           )
-        : renderChips(filtered.map(({ id, label }) => ({ id, label })))}
+        : renderChips(flatOptions.map(({ id, label }) => ({ id, label })))}
 
       {value.includes(OTHER_WRITE_ID) && onOtherTextChange ? (
         <Input
           value={otherText}
           onChange={(e) => onOtherTextChange(e.target.value)}
-          placeholder="Describe your path or affiliation"
+          placeholder={otherPlaceholder}
           className="h-10 bg-card border-border/60 text-sm"
         />
       ) : null}

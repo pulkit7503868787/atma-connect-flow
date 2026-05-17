@@ -37,6 +37,8 @@ const deriveSpiritualPath = (medIds: string[]): string | null => {
   if (medIds.includes("mindfulness") || medIds.includes("vipassana")) return "mindfulness";
   if (medIds.includes("mantra")) return "bhakti";
   if (medIds.includes("silence")) return "advaita";
+  if (medIds.includes("dhyan")) return "advaita";
+  if (medIds.includes("meditation_tantra")) return "tantra";
   return medIds.length ? "integral" : null;
 };
 
@@ -56,6 +58,7 @@ const deriveSadhanaFromPractices = (pracIds: string[]): string => {
 const Onboarding = () => {
   const nav = useNavigate();
   const [step, setStep] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
   const [name, setName] = useState("");
   const [age, setAge] = useState("28");
   const [intent, setIntent] = useState<string>("");
@@ -115,22 +118,28 @@ const Onboarding = () => {
 
   const next = async () => {
     if (step < TOTAL - 1) {
-      setStep(step + 1);
+      setStep((s) => s + 1);
       return;
     }
+
+    if (submitting) return;
+    setSubmitting(true);
 
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) {
+      setSubmitting(false);
       toast.error("Please sign in to continue.");
       nav("/auth");
       return;
     }
 
     const existingProfile = await getCurrentUserProfile();
-    const derivedGender = existingProfile?.gender?.trim() || "unspecified";
+    let derivedGender = existingProfile?.gender?.trim() || "unspecified";
+    if (intent === "Bride") derivedGender = "male";
+    else if (intent === "Groom") derivedGender = "female";
     const derivedSeekingGender =
       intent === "Bride" ? "female" : intent === "Groom" ? "male" : existingProfile?.seeking_gender?.trim() || "any";
     const parsedAge = Number.parseInt(age, 10);
@@ -142,6 +151,12 @@ const Onboarding = () => {
     const derivedBio =
       existingProfile?.bio?.trim() || "On a spiritual journey seeking a conscious connection.";
     const derivedGuru = guru || existingProfile?.guru || "";
+    if (!derivedGuru) {
+      setSubmitting(false);
+      toast.error("Please choose a guide in Spiritual Essence before entering.");
+      setStep(1);
+      return;
+    }
     const selectedPractices = commitCustomToList(prac, pracOther);
     const finalPractices = selectedPractices.length > 0 ? selectedPractices : ["yoga"];
     const spiritualPath =
@@ -176,11 +191,12 @@ const Onboarding = () => {
     });
 
     if (!result.ok) {
+      setSubmitting(false);
       toast.error(result.error ?? "Could not save your profile.");
       return;
     }
 
-    nav("/app");
+    nav("/app", { replace: true });
   };
 
   const back = () => (step > 0 ? setStep(step - 1) : nav(-1));
@@ -270,7 +286,7 @@ const Onboarding = () => {
             <p className="text-xs uppercase tracking-[0.3em] text-primary mb-3">Step 3 of 5</p>
             <h2 className="font-serif text-4xl leading-tight">How do you meditate?</h2>
             <p className="text-muted-foreground mt-2">Select all that resonate.</p>
-            <div className="grid grid-cols-2 gap-3 mt-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-6">
               {meditationTypes.map((m) => {
                 const sel = med.includes(m.id);
                 return (
@@ -278,18 +294,18 @@ const Onboarding = () => {
                     key={m.id}
                     onClick={() => toggle(med, setMed, m.id)}
                     className={cn(
-                      "p-5 rounded-2xl border-2 text-left transition-all",
+                      "p-3 rounded-xl border-2 text-left transition-all",
                       sel ? "bg-primary/10 border-primary shadow-warm" : "bg-card border-border/60 hover:border-primary/40"
                     )}
                   >
-                    <div className="text-3xl mb-2">{m.icon}</div>
-                    <div className="font-medium">{m.label}</div>
-                    {sel && <Check className="h-4 w-4 text-primary mt-2" />}
+                    <div className="text-xl mb-1">{m.icon}</div>
+                    <div className="text-sm font-medium leading-tight">{m.label}</div>
+                    {sel && <Check className="h-3.5 w-3.5 text-primary mt-1.5" />}
                   </button>
                 );
               })}
             </div>
-            <div className="mt-10 space-y-2">
+            <div className="mt-8 space-y-2">
               <p className="text-sm font-medium">Spiritual path & affiliations</p>
               <p className="text-xs text-muted-foreground">Choose all that shape your journey.</p>
               <ChipMultiSelect
@@ -298,7 +314,7 @@ const Onboarding = () => {
                 onChange={setPathIds}
                 otherText={pathOther}
                 onOtherTextChange={setPathOther}
-                searchPlaceholder="Search paths…"
+                otherPlaceholder="Your path or affiliation"
               />
             </div>
           </div>
@@ -316,6 +332,7 @@ const Onboarding = () => {
               onChange={setPrac}
               otherText={pracOther}
               onOtherTextChange={setPracOther}
+              otherPlaceholder="A practice you hold dear"
             />
           </div>
         )}
@@ -404,10 +421,12 @@ const Onboarding = () => {
       <footer className="fixed bottom-0 inset-x-0 p-5 bg-gradient-to-t from-background via-background/95 to-transparent">
         <div className="max-w-md mx-auto">
           <Button
+            disabled={submitting}
             onClick={() => void next()}
             className="w-full h-13 py-6 bg-gradient-saffron text-primary-foreground shadow-warm text-base font-medium"
           >
-            {step === TOTAL - 1 ? "Enter AatmamIlan" : "Continue"} <ArrowRight className="ml-2 h-4 w-4" />
+            {submitting ? "Saving…" : step === TOTAL - 1 ? "Enter AatmamIlan" : "Continue"}{" "}
+            {!submitting && <ArrowRight className="ml-2 h-4 w-4" />}
           </Button>
         </div>
       </footer>

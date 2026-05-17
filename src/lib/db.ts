@@ -283,7 +283,6 @@ export const getProfilePhotoUrls = (
     const t = u?.trim();
     if (t && !urls.includes(t)) urls.push(t);
   }
-  if (!urls.length) urls.push(getAvatarForId(profile.id));
   return urls;
 };
 

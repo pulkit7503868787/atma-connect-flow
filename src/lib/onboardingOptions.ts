@@ -110,13 +110,33 @@ export const gurus: GuruEntry[] = [
   {
     id: "radhasoami",
     name: "Radha Soami",
+    shortLabel: "Radha Soami",
     tradition: "Sant Mat",
     lineage: "Surat Shabd Yoga",
     bio: "Inner sound and light with ethical living.",
+    imagePath: "/gurus/radha-soami.jpg",
+  },
+  {
+    id: "guru-nanak",
+    name: "Guru Nanak",
+    shortLabel: "Guru Nanak",
+    tradition: "Sikh · Gurbani",
+    lineage: "Naam simran · seva",
+    bio: "Remembrance of the One through naam and humble service.",
+    imagePath: "/gurus/guru-nanak.jpg",
+  },
+  {
+    id: "buddha",
+    name: "Buddha",
+    shortLabel: "Buddha",
+    tradition: "Buddhist path",
+    lineage: "Mindfulness · compassion",
+    bio: "Awakening through mindful presence and loving-kindness.",
+    imagePath: "/gurus/buddha.jpg",
   },
   {
     id: "other",
-    name: "Other (write)",
+    name: "Other",
     shortLabel: "Other",
     tradition: "Your lineage",
     bio: "A guide or path not listed — honour it in your own words.",
@@ -138,6 +158,7 @@ export const spiritualPathGroups: SpiritualPathGroup[] = [
       { id: "mindfulness", label: "Mindfulness" },
       { id: "tantra", label: "Tantra (classical)" },
       { id: "integral", label: "Integral yoga" },
+      { id: OTHER_WRITE_ID, label: "Other" },
     ],
   },
   {
@@ -167,7 +188,6 @@ export const spiritualPathGroups: SpiritualPathGroup[] = [
       { id: "tm", label: "TM" },
       { id: "vipassana_path", label: "Vipassana" },
       { id: "yoga_teacher", label: "Yoga Teacher" },
-      { id: OTHER_WRITE_ID, label: "Other (write)" },
     ],
   },
 ];
@@ -184,7 +204,7 @@ export const serializeSpiritualPathIds = (ids: string[]): string => [...new Set(
 
 export const formatSpiritualPathsDisplay = (raw: string | null | undefined): string => {
   const ids = parseSpiritualPathIds(raw);
-  if (!ids.length) return "—";
+  if (!ids.length) return "";
   return ids
     .map((id) => {
       if (id.startsWith("custom:")) return id.slice(7);
@@ -239,7 +259,7 @@ export const occupationOptions = [
   { id: "homemaker", label: "Homemaker" },
   { id: "retired", label: "Retired" },
   { id: "spiritual_worker", label: "Spiritual / seva full-time" },
-  { id: OTHER_WRITE_ID, label: "Other (write)" },
+  { id: OTHER_WRITE_ID, label: "Other" },
 ];
 
 export const customListId = (text: string) => `custom:${text.trim()}`;
@@ -265,6 +285,7 @@ export const spiritualValues = [
   { id: "ishvara_pranidhana", label: "Surrender" },
   { id: "sangha", label: "Sangha" },
   { id: "silence", label: "Noble silence" },
+  { id: OTHER_WRITE_ID, label: "Other" },
 ];
 
 export const programsUndergone = [
@@ -274,7 +295,7 @@ export const programsUndergone = [
   { id: "retreat_silent", label: "Silent retreat (7+ days)" },
   { id: "kriya_init", label: "Kriya initiation" },
   { id: "ytt", label: "Yoga teacher training" },
-  { id: OTHER_WRITE_ID, label: "Other (write)" },
+  { id: OTHER_WRITE_ID, label: "Other" },
 ];
 
 export const meditationExperiences = [
@@ -386,6 +407,8 @@ export const meditationTypes = [
   { id: "mindfulness", label: "Mindfulness", icon: "🌸" },
   { id: "bhakti", label: "Bhakti", icon: "🪔" },
   { id: "silence", label: "Silence", icon: "🤫" },
+  { id: "dhyan", label: "Dhyan", icon: "🕉️" },
+  { id: "meditation_tantra", label: "Tantra", icon: "🔥" },
 ];
 
 export const practices = [
@@ -397,7 +420,7 @@ export const practices = [
   { id: "vegetarian", label: "Vegetarian" },
   { id: "journaling", label: "Journaling" },
   { id: "scripture", label: "Scripture Study" },
-  { id: OTHER_WRITE_ID, label: "Other (write)" },
+  { id: OTHER_WRITE_ID, label: "Other" },
 ];
 
 export const dietOptions = [
@@ -428,8 +451,15 @@ export const callPreferences = [
   { id: "either", label: "Either is fine" },
 ];
 
+export const SELECT_PLACEHOLDER = "Choose…";
+
 export const optionLabel = (options: { id: string; label: string }[], id: string | null | undefined) =>
-  options.find((x) => x.id === id)?.label ?? "—";
+  options.find((x) => x.id === id)?.label ?? "";
+
+export const heightOptions = Array.from({ length: 71 }, (_, i) => {
+  const cm = i + 140;
+  return { value: String(cm), label: `${cm} cm` };
+});
 
 export const listIdsForUi = (ids: string[]) => {
   const hasCustom = ids.some((id) => id.startsWith("custom:"));
@@ -451,13 +481,13 @@ export const commitCustomToList = (ids: string[], customText: string) => {
 
 export const guruDisplayName = (guruId: string | null | undefined, notes?: string | null) => {
   const id = resolveGuruId(guruId);
-  if (!id) return "—";
+  if (!id) return "";
   if (id === "other" && notes?.trim()) return notes.trim();
   return gurus.find((g) => g.id === id)?.name ?? guruId ?? "—";
 };
 
 export const occupationLabel = (raw: string | null | undefined) => {
-  if (!raw?.trim()) return "—";
+  if (!raw?.trim()) return "";
   if (raw.startsWith("custom:")) return raw.slice(7);
   return occupationOptions.find((o) => o.id === raw)?.label ?? raw;
 };

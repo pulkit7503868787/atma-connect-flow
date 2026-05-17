@@ -34,7 +34,15 @@ export const ProfilePhotoGallery = ({ photos, alt, className, autoSlideMs = 5500
     return () => window.clearInterval(timer);
   }, [emblaApi, urls.length, autoSlideMs]);
 
-  if (!urls.length) return null;
+  if (!urls.length) {
+    return (
+      <div className={cn("relative h-full w-full bg-gradient-to-br from-primary/20 via-card to-accent/10 grid place-items-center", className)}>
+        <span className="text-5xl font-serif text-primary/40" aria-hidden>
+          ॐ
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("relative h-full w-full", className)}>

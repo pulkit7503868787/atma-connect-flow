@@ -65,9 +65,11 @@ import {
   sadhanaFrequencies,
   sevaInclinations,
   serializeSpiritualPathWithOther,
+  SELECT_PLACEHOLDER,
   smokingHabits,
   spiritualPathGroups,
   spiritualValues,
+  heightOptions,
 } from "@/lib/onboardingOptions";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
@@ -104,7 +106,7 @@ const Profile = () => {
   const [editBirthPlace, setEditBirthPlace] = useState("");
   const [editOccupation, setEditOccupation] = useState("");
   const [editOccupationOther, setEditOccupationOther] = useState("");
-  const [occupationQuery, setOccupationQuery] = useState("");
+  const [editValuesOther, setEditValuesOther] = useState("");
   const [editPrograms, setEditPrograms] = useState<string[]>([]);
   const [editSadhana, setEditSadhana] = useState("");
   const [editValues, setEditValues] = useState<string[]>([]);
@@ -183,7 +185,8 @@ const Profile = () => {
       setEditOccupationOther("");
     }
     setEditSadhana(me.sadhana_frequency ?? "");
-    setEditValues([...me.spiritual_values]);
+    setEditValues(listIdsForUi(me.spiritual_values));
+    setEditValuesOther(extractCustomFromList(me.spiritual_values));
     setEditMeditation(me.meditation_experience ?? "");
     setEditSeva(me.seva_inclination ?? "");
     setEditGuruNotes(me.guru_notes ?? "");
@@ -210,7 +213,6 @@ const Profile = () => {
     setEditGalleryUrls([...(me.profile_gallery_urls ?? [])]);
   }, [me, isOwn]);
 
-  const galleryProfiles = useMemo(() => others.slice(0, 3), [others]);
   const otherProfile = useMemo(() => (id ? others.find((x) => x.id === id) ?? null : null), [id, others]);
 
   const profile = useMemo(() => {
@@ -405,17 +407,7 @@ const Profile = () => {
       age = n;
     }
 
-    let height_cm: number | null = null;
-    const ht = editHeightCm.trim();
-    if (ht !== "") {
-      const hn = Number.parseInt(ht, 10);
-      if (Number.isNaN(hn) || hn < 100 || hn > 250) {
-        toast.error("Height: enter centimeters between 100 and 250, or leave blank.");
-        setSavingProfile(false);
-        return;
-      }
-      height_cm = hn;
-    }
+    const height_cm = editHeightCm.trim() ? Number.parseInt(editHeightCm, 10) : null;
 
     const result = await updateUserProfile(me.id, {
       full_name: editName.trim() || null,
@@ -445,7 +437,7 @@ const Profile = () => {
             : null
           : editOccupation.trim() || null,
       sadhana_frequency: editSadhana || null,
-      spiritual_values: editValues,
+      spiritual_values: commitCustomToList(editValues, editValuesOther),
       meditation_experience: editMeditation || null,
       seva_inclination: editSeva || null,
       guru_photo_url: editGuruPhotoUrl.trim() || null,
@@ -707,7 +699,7 @@ const Profile = () => {
                     onChange={(e) => setEditAge(e.target.value)}
                     className={selectClass}
                   >
-                    <option value="">—</option>
+                    <option value="">{SELECT_PLACEHOLDER}</option>
                     {ageOptions.map((a) => (
                       <option key={a.value} value={a.value}>
                         {a.label}
@@ -802,7 +794,7 @@ const Profile = () => {
                         onChange={setEditSpiritualPathIds}
                         otherText={editSpiritualPathOther}
                         onOtherTextChange={setEditSpiritualPathOther}
-                        searchPlaceholder="Search paths…"
+                        otherPlaceholder="Your path or affiliation"
                       />
                     </div>
                     <div>
@@ -813,6 +805,7 @@ const Profile = () => {
                         onChange={setEditPractices}
                         otherText={editPracticesOther}
                         onOtherTextChange={setEditPracticesOther}
+                        otherPlaceholder="A practice you hold dear"
                       />
                     </div>
                     <div>
@@ -823,12 +816,13 @@ const Profile = () => {
                         onChange={setEditPrograms}
                         otherText={editProgramsOther}
                         onOtherTextChange={setEditProgramsOther}
+                        otherPlaceholder="A program or retreat you completed"
                       />
                     </div>
                     <div className="space-y-2">
                       <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Sadhana frequency</p>
                       <select value={editSadhana} onChange={(e) => setEditSadhana(e.target.value)} className={selectClass}>
-                        <option value="">—</option>
+                        <option value="">{SELECT_PLACEHOLDER}</option>
                         {sadhanaFrequencies.map((s) => (
                           <option key={s.id} value={s.id}>
                             {s.label}
@@ -838,30 +832,20 @@ const Profile = () => {
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">Spiritual values</p>
-                      <div className="flex flex-wrap gap-2">
-                        {spiritualValues.map((v) => {
-                          const sel = editValues.includes(v.id);
-                          return (
-                            <button
-                              key={v.id}
-                              type="button"
-                              onClick={() => toggleInList(v.id, editValues, setEditValues)}
-                              className={cn(
-                                "px-3 py-2 rounded-full border text-xs font-medium transition-all",
-                                sel ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border/60 hover:border-primary/40"
-                              )}
-                            >
-                              {v.label}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <ChipMultiSelect
+                        options={spiritualValues}
+                        value={editValues}
+                        onChange={setEditValues}
+                        otherText={editValuesOther}
+                        onOtherTextChange={setEditValuesOther}
+                        otherPlaceholder="A value that guides your life"
+                      />
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Meditation depth</p>
                         <select value={editMeditation} onChange={(e) => setEditMeditation(e.target.value)} className={selectClass}>
-                          <option value="">—</option>
+                          <option value="">{SELECT_PLACEHOLDER}</option>
                           {meditationExperiences.map((m) => (
                             <option key={m.id} value={m.id}>
                               {m.label}
@@ -872,7 +856,7 @@ const Profile = () => {
                       <div className="space-y-2">
                         <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Seva inclination</p>
                         <select value={editSeva} onChange={(e) => setEditSeva(e.target.value)} className={selectClass}>
-                          <option value="">—</option>
+                          <option value="">{SELECT_PLACEHOLDER}</option>
                           {sevaInclinations.map((s) => (
                             <option key={s.id} value={s.id}>
                               {s.label}
@@ -895,7 +879,7 @@ const Profile = () => {
                           onChange={(e) => setEditMarriageTimeline(e.target.value)}
                           className={selectClass}
                         >
-                          <option value="">—</option>
+                          <option value="">{SELECT_PLACEHOLDER}</option>
                           {marriageTimelines.map((m) => (
                             <option key={m.id} value={m.id}>
                               {m.label}
@@ -910,7 +894,7 @@ const Profile = () => {
                           onChange={(e) => setEditMaritalStatus(e.target.value)}
                           className={selectClass}
                         >
-                          <option value="">—</option>
+                          <option value="">{SELECT_PLACEHOLDER}</option>
                           {maritalStatuses.map((m) => (
                             <option key={m.id} value={m.id}>
                               {m.label}
@@ -921,7 +905,7 @@ const Profile = () => {
                       <div className="space-y-2">
                         <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Children</p>
                         <select value={editChildren} onChange={(e) => setEditChildren(e.target.value)} className={selectClass}>
-                          <option value="">—</option>
+                          <option value="">{SELECT_PLACEHOLDER}</option>
                           {childrenPreferences.map((c) => (
                             <option key={c.id} value={c.id}>
                               {c.label}
@@ -932,7 +916,7 @@ const Profile = () => {
                       <div className="space-y-2">
                         <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Relocation</p>
                         <select value={editRelocation} onChange={(e) => setEditRelocation(e.target.value)} className={selectClass}>
-                          <option value="">—</option>
+                          <option value="">{SELECT_PLACEHOLDER}</option>
                           {relocationOptions.map((r) => (
                             <option key={r.id} value={r.id}>
                               {r.label}
@@ -947,7 +931,7 @@ const Profile = () => {
                           onChange={(e) => setEditFamilyOrientation(e.target.value)}
                           className={selectClass}
                         >
-                          <option value="">—</option>
+                          <option value="">{SELECT_PLACEHOLDER}</option>
                           {familyOrientations.map((f) => (
                             <option key={f.id} value={f.id}>
                               {f.label}
@@ -966,7 +950,7 @@ const Profile = () => {
                       <div className="space-y-2">
                         <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Diet</p>
                         <select value={editDiet} onChange={(e) => setEditDiet(e.target.value)} className={selectClass}>
-                          <option value="">—</option>
+                          <option value="">{SELECT_PLACEHOLDER}</option>
                           {dietOptions.map((d) => (
                             <option key={d.id} value={d.id}>
                               {d.label}
@@ -977,7 +961,7 @@ const Profile = () => {
                       <div className="space-y-2">
                         <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Daily rhythm</p>
                         <select value={editDailyRhythm} onChange={(e) => setEditDailyRhythm(e.target.value)} className={selectClass}>
-                          <option value="">—</option>
+                          <option value="">{SELECT_PLACEHOLDER}</option>
                           {dailyRhythmOptions.map((d) => (
                             <option key={d.id} value={d.id}>
                               {d.label}
@@ -988,7 +972,7 @@ const Profile = () => {
                       <div className="space-y-2 sm:col-span-2">
                         <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Householder rhythm</p>
                         <select value={editLifestyle} onChange={(e) => setEditLifestyle(e.target.value)} className={selectClass}>
-                          <option value="">—</option>
+                          <option value="">{SELECT_PLACEHOLDER}</option>
                           {lifestyleOptions.map((l) => (
                             <option key={l.id} value={l.id}>
                               {l.label}
@@ -999,7 +983,7 @@ const Profile = () => {
                       <div className="space-y-2">
                         <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Smoking</p>
                         <select value={editSmoking} onChange={(e) => setEditSmoking(e.target.value)} className={selectClass}>
-                          <option value="">—</option>
+                          <option value="">{SELECT_PLACEHOLDER}</option>
                           {smokingHabits.map((s) => (
                             <option key={s.id} value={s.id}>
                               {s.label}
@@ -1010,7 +994,7 @@ const Profile = () => {
                       <div className="space-y-2">
                         <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Drinking</p>
                         <select value={editDrinking} onChange={(e) => setEditDrinking(e.target.value)} className={selectClass}>
-                          <option value="">—</option>
+                          <option value="">{SELECT_PLACEHOLDER}</option>
                           {drinkingHabits.map((d) => (
                             <option key={d.id} value={d.id}>
                               {d.label}
@@ -1051,7 +1035,7 @@ const Profile = () => {
                     <div className="space-y-2">
                       <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Religion</p>
                       <select value={editReligion} onChange={(e) => setEditReligion(e.target.value)} className={selectClass}>
-                        <option value="">—</option>
+                        <option value="">{SELECT_PLACEHOLDER}</option>
                         {religionOptions.map((r) => (
                           <option key={r.id} value={r.id}>
                             {r.label}
@@ -1081,7 +1065,7 @@ const Profile = () => {
                           onChange={(e) => setEditNakshatra(e.target.value)}
                           className={selectClass}
                         >
-                          <option value="">—</option>
+                          <option value="">{SELECT_PLACEHOLDER}</option>
                           {nakshatraOptions.map((n) => (
                             <option key={n.id} value={n.id}>
                               {n.label}
@@ -1149,30 +1133,18 @@ const Profile = () => {
                       <Label htmlFor="occupation" className="text-[11px] uppercase tracking-wider text-muted-foreground">
                         Occupation
                       </Label>
-                      <Input
-                        value={occupationQuery}
-                        onChange={(e) => setOccupationQuery(e.target.value)}
-                        placeholder="Search occupation…"
-                        className="h-10 bg-card border-border/60 text-sm"
-                      />
                       <select
                         id="occupation"
                         value={editOccupation}
                         onChange={(e) => setEditOccupation(e.target.value)}
                         className={selectClass}
                       >
-                        <option value="">—</option>
-                        {occupationOptions
-                          .filter(
-                            (o) =>
-                              !occupationQuery.trim() ||
-                              o.label.toLowerCase().includes(occupationQuery.trim().toLowerCase())
-                          )
-                          .map((o) => (
-                            <option key={o.id} value={o.id}>
-                              {o.label}
-                            </option>
-                          ))}
+                        <option value="">{SELECT_PLACEHOLDER}</option>
+                        {occupationOptions.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.label}
+                          </option>
+                        ))}
                       </select>
                       {editOccupation === OTHER_WRITE_ID ? (
                         <Input
@@ -1187,7 +1159,7 @@ const Profile = () => {
                       <div className="space-y-2">
                         <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Education</p>
                         <select value={editEducation} onChange={(e) => setEditEducation(e.target.value)} className={selectClass}>
-                          <option value="">—</option>
+                          <option value="">{SELECT_PLACEHOLDER}</option>
                           {educationLevels.map((e) => (
                             <option key={e.id} value={e.id}>
                               {e.label}
@@ -1198,7 +1170,7 @@ const Profile = () => {
                       <div className="space-y-2">
                         <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Income</p>
                         <select value={editIncome} onChange={(e) => setEditIncome(e.target.value)} className={selectClass}>
-                          <option value="">—</option>
+                          <option value="">{SELECT_PLACEHOLDER}</option>
                           {incomeRanges.map((i) => (
                             <option key={i.id} value={i.id}>
                               {i.label}
@@ -1208,16 +1180,21 @@ const Profile = () => {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="height" className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                          Height (cm)
+                          Height
                         </Label>
-                        <Input
+                        <select
                           id="height"
-                          inputMode="numeric"
                           value={editHeightCm}
                           onChange={(e) => setEditHeightCm(e.target.value)}
-                          placeholder="e.g. 168"
-                          className="h-10 bg-card border-border/60 text-sm"
-                        />
+                          className={selectClass}
+                        >
+                          <option value="">{SELECT_PLACEHOLDER}</option>
+                          {heightOptions.map((h) => (
+                            <option key={h.value} value={h.value}>
+                              {h.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -1262,7 +1239,7 @@ const Profile = () => {
                         onChange={(e) => setEditCallPreference(e.target.value)}
                         className={selectClass}
                       >
-                        <option value="">—</option>
+                        <option value="">{SELECT_PLACEHOLDER}</option>
                         {callPreferences.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.label}
@@ -1273,13 +1250,6 @@ const Profile = () => {
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
-              <div className="grid grid-cols-3 gap-2">
-                {galleryProfiles.map((p) => (
-                  <div key={p.id} className="aspect-square rounded-xl overflow-hidden">
-                    <img src={getProfilePhotoUrl(p)} alt="" loading="lazy" className="h-full w-full object-cover" />
-                  </div>
-                ))}
-              </div>
               <Button
                 type="button"
                 disabled={savingProfile}
@@ -1485,13 +1455,6 @@ const Profile = () => {
                 </div>
               ) : null}
 
-              <div className="mt-6 grid grid-cols-3 gap-2">
-                {galleryProfiles.map((p) => (
-                  <div key={p.id} className="aspect-square rounded-xl overflow-hidden">
-                    <img src={getProfilePhotoUrl(p)} alt="" loading="lazy" className="h-full w-full object-cover" />
-                  </div>
-                ))}
-              </div>
             </div>
 
             {isMutualMatched ? (
