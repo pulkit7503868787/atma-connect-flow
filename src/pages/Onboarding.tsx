@@ -18,7 +18,9 @@ import {
   practices,
   resolveGuruId,
   sadhanaFrequencies,
-  serializeSpiritualPathWithOther,
+  OTHER_WRITE_CORE_ID,
+  OTHER_WRITE_TRADITIONS_ID,
+  serializeSpiritualPathWithOthers,
   spiritualPathGroups,
   formatSpiritualPathsDisplay,
   parseSpiritualPathForUi,
@@ -27,7 +29,7 @@ import { cn } from "@/lib/utils";
 import { updateUserProfile } from "@/lib/profile";
 import { supabase } from "@/lib/supabaseClient";
 import { toast } from "sonner";
-import { getCurrentUserProfile, isProfileComplete } from "@/lib/db";
+import { getCurrentUserProfile, hasFinishedOnboarding } from "@/lib/db";
 
 const TOTAL = 5;
 
@@ -65,7 +67,8 @@ const Onboarding = () => {
   const [guru, setGuru] = useState<string>("");
   const [guruOtherName, setGuruOtherName] = useState("");
   const [pathIds, setPathIds] = useState<string[]>([]);
-  const [pathOther, setPathOther] = useState("");
+  const [pathOtherCore, setPathOtherCore] = useState("");
+  const [pathOtherTraditions, setPathOtherTraditions] = useState("");
   const [med, setMed] = useState<string[]>([]);
   const [prac, setPrac] = useState<string[]>([]);
   const [pracOther, setPracOther] = useState("");
@@ -78,7 +81,12 @@ const Onboarding = () => {
 
   const previewPath =
     pathIds.length > 0
-      ? formatSpiritualPathsDisplay(serializeSpiritualPathWithOther(pathIds, pathOther))
+      ? formatSpiritualPathsDisplay(
+          serializeSpiritualPathWithOthers(pathIds, {
+            [OTHER_WRITE_CORE_ID]: pathOtherCore,
+            [OTHER_WRITE_TRADITIONS_ID]: pathOtherTraditions,
+          })
+        )
       : formatSpiritualPathsDisplay(deriveSpiritualPath(med) ?? "integral");
 
   useEffect(() => {
@@ -86,10 +94,11 @@ const Onboarding = () => {
 
     const guardCompletedProfile = async () => {
       const profile = await getCurrentUserProfile();
-      if (mounted && isProfileComplete(profile)) {
+      if (mounted && hasFinishedOnboarding(profile)) {
         nav("/app", { replace: true });
+        return;
       }
-      if (mounted && profile && !isProfileComplete(profile)) {
+      if (mounted && profile && !hasFinishedOnboarding(profile)) {
         if (profile.full_name?.trim()) setName(profile.full_name.trim());
         if (profile.guru?.trim()) {
           setGuru(resolveGuruId(profile.guru.trim()));
@@ -102,7 +111,8 @@ const Onboarding = () => {
         const parsed = parseSpiritualPathForUi(profile.spiritual_path);
         if (parsed.ids.length) {
           setPathIds(parsed.ids);
-          setPathOther(parsed.otherText);
+          setPathOtherCore(parsed.coreText);
+          setPathOtherTraditions(parsed.traditionsText);
         }
         if (profile.age != null) setAge(String(profile.age));
         if (profile.marriage_timeline?.trim()) setOptionalMarriage(profile.marriage_timeline.trim());
@@ -161,7 +171,10 @@ const Onboarding = () => {
     const finalPractices = selectedPractices.length > 0 ? selectedPractices : ["yoga"];
     const spiritualPath =
       pathIds.length > 0
-        ? serializeSpiritualPathWithOther(pathIds, pathOther)
+        ? serializeSpiritualPathWithOthers(pathIds, {
+            [OTHER_WRITE_CORE_ID]: pathOtherCore,
+            [OTHER_WRITE_TRADITIONS_ID]: pathOtherTraditions,
+          })
         : deriveSpiritualPath(med) ?? existingProfile?.spiritual_path ?? "integral";
     const sadhanaFrequency = optionalSadhana.trim() || deriveSadhanaFromPractices(finalPractices);
     const marriageTimeline = optionalMarriage.trim() || "when_ready";
@@ -196,6 +209,14 @@ const Onboarding = () => {
       return;
     }
 
+    const refreshed = await getCurrentUserProfile();
+    if (!hasFinishedOnboarding(refreshed)) {
+      setSubmitting(false);
+      toast.error("Profile saved but onboarding could not be confirmed. Please tap Enter again.");
+      return;
+    }
+
+    setSubmitting(false);
     nav("/app", { replace: true });
   };
 
@@ -312,9 +333,18 @@ const Onboarding = () => {
                 groups={spiritualPathGroups}
                 value={pathIds}
                 onChange={setPathIds}
-                otherText={pathOther}
-                onOtherTextChange={setPathOther}
-                otherPlaceholder="Your path or affiliation"
+                otherFields={{
+                  [OTHER_WRITE_CORE_ID]: {
+                    text: pathOtherCore,
+                    onTextChange: setPathOtherCore,
+                    placeholder: "Your core path in your own words",
+                  },
+                  [OTHER_WRITE_TRADITIONS_ID]: {
+                    text: pathOtherTraditions,
+                    onTextChange: setPathOtherTraditions,
+                    placeholder: "Your tradition or affiliation",
+                  },
+                }}
               />
             </div>
           </div>

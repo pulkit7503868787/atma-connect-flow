@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { getCurrentSession, signOutUser } from "@/lib/auth";
-import { getCurrentUserProfile, isProfileComplete } from "@/lib/db";
+import { getCurrentUserProfile, hasFinishedOnboarding } from "@/lib/db";
 
 export const ProtectedRoute = () => {
   const location = useLocation();
@@ -38,7 +38,7 @@ export const ProtectedRoute = () => {
       }
 
       setIsAuthenticated(true);
-      setNeedsOnboarding(!isProfileComplete(profile));
+      setNeedsOnboarding(!hasFinishedOnboarding(profile));
       setIsChecking(false);
     };
 

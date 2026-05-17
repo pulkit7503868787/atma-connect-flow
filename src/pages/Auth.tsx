@@ -17,7 +17,7 @@ import {
 } from "@/lib/auth";
 
 import { supabase } from "@/lib/supabaseClient";
-import { getCurrentUserProfile, isProfileComplete } from "@/lib/db";
+import { getCurrentUserProfile, hasFinishedOnboarding } from "@/lib/db";
 
 const guruPresence = [
   {
@@ -99,7 +99,7 @@ const Auth = () => {
 
         const profile = await getCurrentUserProfile();
 
-        nav(isProfileComplete(profile) ? "/app" : "/onboarding", {
+        nav(hasFinishedOnboarding(profile) ? "/app" : "/onboarding", {
           replace: true,
         });
       }
@@ -117,7 +117,7 @@ const Auth = () => {
 
         const profile = await getCurrentUserProfile();
 
-        nav(isProfileComplete(profile) ? "/app" : "/onboarding", {
+        nav(hasFinishedOnboarding(profile) ? "/app" : "/onboarding", {
           replace: true,
         });
       }
@@ -211,7 +211,7 @@ const Auth = () => {
     if (mode === "signin") {
       const profile = await getCurrentUserProfile();
 
-      nav(isProfileComplete(profile) ? "/app" : "/onboarding", {
+      nav(hasFinishedOnboarding(profile) ? "/app" : "/onboarding", {
         replace: true,
       });
 

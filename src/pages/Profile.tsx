@@ -64,8 +64,11 @@ import {
   resolveGuruId,
   sadhanaFrequencies,
   sevaInclinations,
-  serializeSpiritualPathWithOther,
+  OTHER_WRITE_CORE_ID,
+  OTHER_WRITE_TRADITIONS_ID,
+  serializeSpiritualPathWithOthers,
   SELECT_PLACEHOLDER,
+  SELECT_SOFT_DEFAULT,
   smokingHabits,
   spiritualPathGroups,
   spiritualValues,
@@ -97,7 +100,9 @@ const Profile = () => {
   const [editLifestyle, setEditLifestyle] = useState("");
   const [editPractices, setEditPractices] = useState<string[]>([]);
   const [editSpiritualPathIds, setEditSpiritualPathIds] = useState<string[]>([]);
-  const [editSpiritualPathOther, setEditSpiritualPathOther] = useState("");
+  const [editSpiritualPathOtherCore, setEditSpiritualPathOtherCore] = useState("");
+  const [editSpiritualPathOtherTraditions, setEditSpiritualPathOtherTraditions] = useState("");
+  const [editLanguagesOther, setEditLanguagesOther] = useState("");
   const [editGuruOther, setEditGuruOther] = useState("");
   const [editPracticesOther, setEditPracticesOther] = useState("");
   const [editProgramsOther, setEditProgramsOther] = useState("");
@@ -139,7 +144,6 @@ const Profile = () => {
     null
   );
   const avatarInputRef = useRef<HTMLInputElement>(null);
-  const guruPhotoInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -170,7 +174,8 @@ const Profile = () => {
     setEditPracticesOther(extractCustomFromList(me.practices));
     const pathUi = parseSpiritualPathForUi(me.spiritual_path);
     setEditSpiritualPathIds(pathUi.ids);
-    setEditSpiritualPathOther(pathUi.otherText);
+    setEditSpiritualPathOtherCore(pathUi.coreText);
+    setEditSpiritualPathOtherTraditions(pathUi.traditionsText);
     setEditPrograms(listIdsForUi(me.programs_undergone));
     setEditProgramsOther(extractCustomFromList(me.programs_undergone));
     setEditBirthDate(me.birth_date ?? "");
@@ -196,9 +201,10 @@ const Profile = () => {
     setEditChildren(me.children_preference ?? "");
     setEditRelocation(me.relocation_openness ?? "");
     setEditFamilyOrientation(me.family_orientation ?? "");
-    setEditLanguages([...me.languages]);
-    setEditSmoking(me.smoking_habit ?? "");
-    setEditDrinking(me.drinking_habit ?? "");
+    setEditLanguages(listIdsForUi(me.languages));
+    setEditLanguagesOther(extractCustomFromList(me.languages));
+    setEditSmoking(me.smoking_habit?.trim() || "none");
+    setEditDrinking(me.drinking_habit?.trim() || "none");
     setEditDailyRhythm(me.daily_rhythm ?? "");
     setEditReligion(me.religion ?? "");
     setEditCaste(me.caste ?? "");
@@ -318,30 +324,6 @@ const Profile = () => {
     toast.success("Photo uploaded.");
   };
 
-  const handleGuruPhotoChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file || !me?.id) {
-      return;
-    }
-
-    const uploaded = await uploadProfileImage(me.id, file);
-    if (uploaded.error || !uploaded.publicUrl) {
-      toast.error(uploaded.error ?? "Could not upload image.");
-      return;
-    }
-
-    const saved = await updateUserProfile(me.id, { guru_photo_url: uploaded.publicUrl });
-    if (!saved.ok) {
-      toast.error(saved.error ?? "Could not save guru image.");
-      return;
-    }
-
-    setEditGuruPhotoUrl(uploaded.publicUrl);
-    setMe((prev) => (prev ? { ...prev, guru_photo_url: uploaded.publicUrl } : null));
-    toast.success("Guru image saved.");
-  };
-
   const handleGalleryAdd = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     e.target.value = "";
@@ -419,7 +401,10 @@ const Profile = () => {
       lifestyle: editLifestyle || null,
       spiritual_path:
         editSpiritualPathIds.length > 0
-          ? serializeSpiritualPathWithOther(editSpiritualPathIds, editSpiritualPathOther)
+          ? serializeSpiritualPathWithOthers(editSpiritualPathIds, {
+              [OTHER_WRITE_CORE_ID]: editSpiritualPathOtherCore,
+              [OTHER_WRITE_TRADITIONS_ID]: editSpiritualPathOtherTraditions,
+            })
           : null,
       practices: commitCustomToList(editPractices, editPracticesOther),
       programs_undergone: commitCustomToList(editPrograms, editProgramsOther),
@@ -446,7 +431,7 @@ const Profile = () => {
       children_preference: editChildren || null,
       relocation_openness: editRelocation || null,
       family_orientation: editFamilyOrientation || null,
-      languages: editLanguages,
+      languages: commitCustomToList(editLanguages, editLanguagesOther),
       smoking_habit: editSmoking || null,
       drinking_habit: editDrinking || null,
       daily_rhythm: editDailyRhythm || null,
@@ -591,9 +576,6 @@ const Profile = () => {
   };
 
   const ownPhotoSrc = me ? getProfilePhotoUrl(me) : "";
-  const ownGuruMeta = editGuru ? gurus.find((g) => g.id === editGuru) : undefined;
-  const ownGuruPortrait = editGuruPhotoUrl.trim() || (ownGuruMeta ? getGuruPortraitSrc(ownGuruMeta) : "") || "";
-
   return (
     <div className="animate-fade-in pb-8">
       {loading && <p className="px-5 pt-6 text-sm text-muted-foreground">Loading profile...</p>}
@@ -609,14 +591,6 @@ const Profile = () => {
             className="sr-only"
             tabIndex={-1}
             onChange={(e) => void handleAvatarChange(e)}
-          />
-          <input
-            ref={guruPhotoInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="sr-only"
-            tabIndex={-1}
-            onChange={(e) => void handleGuruPhotoChange(e)}
           />
           <input
             ref={galleryInputRef}
@@ -651,9 +625,9 @@ const Profile = () => {
             </Link>
           </div>
 
-          <div className="px-5 pt-4 pb-1">
+          <div className="px-5 pt-4 pb-3 relative z-10">
             <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground mb-2">Gallery</p>
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div className="flex gap-2 overflow-x-auto pb-2">
               {editGalleryUrls.map((url) => (
                 <div key={url} className="relative h-24 w-24 shrink-0 rounded-xl overflow-hidden border border-border/50">
                   <img src={url} alt="" className="h-full w-full object-cover" />
@@ -679,7 +653,7 @@ const Profile = () => {
             </div>
           </div>
 
-          <div className="-mt-20 relative px-5">
+          <div className="px-5 mt-2 relative z-10 pb-8">
             <div className="glass-card rounded-3xl p-6 shadow-card space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="profile-name">Name</Label>
@@ -740,40 +714,6 @@ const Profile = () => {
                       otherName={editGuruOther}
                       onOtherNameChange={setEditGuruOther}
                     />
-                    {ownGuruMeta ? (
-                      <div className="flex gap-3 items-start rounded-xl border border-border/40 bg-background/40 p-3">
-                        {ownGuruPortrait ? (
-                          <img
-                            src={ownGuruPortrait}
-                            alt=""
-                            className="h-14 w-14 rounded-full object-cover shrink-0 border border-border/50"
-                          />
-                        ) : (
-                          <div className="h-14 w-14 rounded-full bg-primary/10 border border-border/50 shrink-0 grid place-items-center text-sm text-primary font-serif">
-                            ॐ
-                          </div>
-                        )}
-                        <div className="min-w-0 text-xs space-y-1">
-                          <p className="font-medium text-foreground">{ownGuruMeta.name}</p>
-                          <p className="text-muted-foreground">{ownGuruMeta.tradition}</p>
-                          {ownGuruMeta.lineage ? <p className="text-foreground/80 leading-snug">{ownGuruMeta.lineage}</p> : null}
-                        </div>
-                      </div>
-                    ) : null}
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-9 border-border/60 text-xs"
-                        onClick={() => guruPhotoInputRef.current?.click()}
-                      >
-                        Guru image
-                      </Button>
-                      <p className="text-[11px] text-muted-foreground w-full leading-relaxed">
-                        Optional portrait for your lineage. Catalog gurus may include a suggested image.
-                      </p>
-                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="guru-notes" className="text-[11px] uppercase tracking-wider text-muted-foreground">
                         Guru / lineage notes
@@ -792,9 +732,18 @@ const Profile = () => {
                         groups={spiritualPathGroups}
                         value={editSpiritualPathIds}
                         onChange={setEditSpiritualPathIds}
-                        otherText={editSpiritualPathOther}
-                        onOtherTextChange={setEditSpiritualPathOther}
-                        otherPlaceholder="Your path or affiliation"
+                        otherFields={{
+                          [OTHER_WRITE_CORE_ID]: {
+                            text: editSpiritualPathOtherCore,
+                            onTextChange: setEditSpiritualPathOtherCore,
+                            placeholder: "Your core path in your own words",
+                          },
+                          [OTHER_WRITE_TRADITIONS_ID]: {
+                            text: editSpiritualPathOtherTraditions,
+                            onTextChange: setEditSpiritualPathOtherTraditions,
+                            placeholder: "Your tradition or affiliation",
+                          },
+                        }}
                       />
                     </div>
                     <div>
@@ -856,7 +805,7 @@ const Profile = () => {
                       <div className="space-y-2">
                         <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Seva inclination</p>
                         <select value={editSeva} onChange={(e) => setEditSeva(e.target.value)} className={selectClass}>
-                          <option value="">{SELECT_PLACEHOLDER}</option>
+                          <option value="">{SELECT_SOFT_DEFAULT}</option>
                           {sevaInclinations.map((s) => (
                             <option key={s.id} value={s.id}>
                               {s.label}
@@ -982,8 +931,7 @@ const Profile = () => {
                       </div>
                       <div className="space-y-2">
                         <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Smoking</p>
-                        <select value={editSmoking} onChange={(e) => setEditSmoking(e.target.value)} className={selectClass}>
-                          <option value="">{SELECT_PLACEHOLDER}</option>
+                        <select value={editSmoking || "none"} onChange={(e) => setEditSmoking(e.target.value)} className={selectClass}>
                           {smokingHabits.map((s) => (
                             <option key={s.id} value={s.id}>
                               {s.label}
@@ -993,8 +941,7 @@ const Profile = () => {
                       </div>
                       <div className="space-y-2">
                         <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Drinking</p>
-                        <select value={editDrinking} onChange={(e) => setEditDrinking(e.target.value)} className={selectClass}>
-                          <option value="">{SELECT_PLACEHOLDER}</option>
+                        <select value={editDrinking || "none"} onChange={(e) => setEditDrinking(e.target.value)} className={selectClass}>
                           {drinkingHabits.map((d) => (
                             <option key={d.id} value={d.id}>
                               {d.label}
@@ -1005,24 +952,14 @@ const Profile = () => {
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">Languages</p>
-                      <div className="flex flex-wrap gap-2">
-                        {languageOptions.map((lang) => {
-                          const sel = editLanguages.includes(lang.id);
-                          return (
-                            <button
-                              key={lang.id}
-                              type="button"
-                              onClick={() => toggleInList(lang.id, editLanguages, setEditLanguages)}
-                              className={cn(
-                                "px-3 py-2 rounded-full border text-xs font-medium transition-all",
-                                sel ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border/60 hover:border-primary/40"
-                              )}
-                            >
-                              {lang.label}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <ChipMultiSelect
+                        options={languageOptions}
+                        value={editLanguages}
+                        onChange={setEditLanguages}
+                        otherText={editLanguagesOther}
+                        onOtherTextChange={setEditLanguagesOther}
+                        otherPlaceholder="Another language you speak"
+                      />
                     </div>
                   </AccordionContent>
                 </AccordionItem>

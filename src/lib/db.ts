@@ -199,6 +199,9 @@ export { toUserProfile as mapSupabaseUserRow };
 
 const hasText = (value: string | null | undefined) => Boolean(value && value.trim().length > 0);
 
+/** User finished the onboarding flow (source of truth for leaving /onboarding). */
+export const hasFinishedOnboarding = (profile: UserProfile | null) => profile?.onboarding_completed === true;
+
 export const isProfileComplete = (profile: UserProfile | null) => {
   if (!profile) {
     return false;

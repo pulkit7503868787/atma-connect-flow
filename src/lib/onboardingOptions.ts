@@ -10,6 +10,10 @@ export type GuruEntry = {
 };
 
 export const OTHER_WRITE_ID = "other_write";
+export const OTHER_WRITE_CORE_ID = "other_write_core";
+export const OTHER_WRITE_TRADITIONS_ID = "other_write_traditions";
+
+export const isOtherWriteOptionId = (id: string) => id.startsWith("other_write");
 
 export const getGuruPortraitSrc = (g: GuruEntry): string | null => g.imagePath?.trim() || null;
 
@@ -158,7 +162,7 @@ export const spiritualPathGroups: SpiritualPathGroup[] = [
       { id: "mindfulness", label: "Mindfulness" },
       { id: "tantra", label: "Tantra (classical)" },
       { id: "integral", label: "Integral yoga" },
-      { id: OTHER_WRITE_ID, label: "Other" },
+      { id: OTHER_WRITE_CORE_ID, label: "Other" },
     ],
   },
   {
@@ -188,6 +192,7 @@ export const spiritualPathGroups: SpiritualPathGroup[] = [
       { id: "tm", label: "TM" },
       { id: "vipassana_path", label: "Vipassana" },
       { id: "yoga_teacher", label: "Yoga Teacher" },
+      { id: OTHER_WRITE_TRADITIONS_ID, label: "Other" },
     ],
   },
 ];
@@ -205,12 +210,7 @@ export const serializeSpiritualPathIds = (ids: string[]): string => [...new Set(
 export const formatSpiritualPathsDisplay = (raw: string | null | undefined): string => {
   const ids = parseSpiritualPathIds(raw);
   if (!ids.length) return "";
-  return ids
-    .map((id) => {
-      if (id.startsWith("custom:")) return id.slice(7);
-      return spiritualPaths.find((p) => p.id === id)?.label ?? id;
-    })
-    .join(" · ");
+  return ids.map((id) => spiritualPathLabelFromId(id)).join(" · ");
 };
 
 export const ageOptions = Array.from({ length: 63 }, (_, i) => {
@@ -370,6 +370,7 @@ export const languageOptions = [
   { id: "bn", label: "Bengali" },
   { id: "gu", label: "Gujarati" },
   { id: "sa", label: "Sanskrit" },
+  { id: OTHER_WRITE_ID, label: "Other" },
 ];
 
 export const educationLevels = [
@@ -452,14 +453,22 @@ export const callPreferences = [
 ];
 
 export const SELECT_PLACEHOLDER = "Choose…";
+export const SELECT_SOFT_DEFAULT = "Not specified";
 
 export const optionLabel = (options: { id: string; label: string }[], id: string | null | undefined) =>
   options.find((x) => x.id === id)?.label ?? "";
 
-export const heightOptions = Array.from({ length: 71 }, (_, i) => {
-  const cm = i + 140;
-  return { value: String(cm), label: `${cm} cm` };
-});
+export const heightOptions = (() => {
+  const opts: { value: string; label: string }[] = [];
+  for (let ft = 4; ft <= 7; ft += 1) {
+    for (let inch = 0; inch < 12; inch += 1) {
+      const cm = Math.round((ft * 12 + inch) * 2.54);
+      if (cm < 140 || cm > 210) continue;
+      opts.push({ value: String(cm), label: `${ft}'${inch}"` });
+    }
+  }
+  return opts;
+})();
 
 export const listIdsForUi = (ids: string[]) => {
   const hasCustom = ids.some((id) => id.startsWith("custom:"));
@@ -492,17 +501,46 @@ export const occupationLabel = (raw: string | null | undefined) => {
   return occupationOptions.find((o) => o.id === raw)?.label ?? raw;
 };
 
-export const serializeSpiritualPathWithOther = (ids: string[], otherText: string) => {
-  const base = ids.filter((id) => id !== OTHER_WRITE_ID && !id.startsWith("custom:"));
-  const t = otherText.trim();
-  const withCustom = ids.includes(OTHER_WRITE_ID) && t ? [...base, customListId(t)] : base;
-  return serializeSpiritualPathIds(withCustom);
+const spiritualPathLabelFromId = (id: string) => {
+  if (id.startsWith("custom:core:")) return id.slice(12);
+  if (id.startsWith("custom:traditions:")) return id.slice(18);
+  if (id.startsWith("custom:")) return id.slice(7);
+  return spiritualPaths.find((p) => p.id === id)?.label ?? id;
+};
+
+/** @deprecated Use serializeSpiritualPathWithOthers */
+export const serializeSpiritualPathWithOther = (ids: string[], otherText: string) =>
+  serializeSpiritualPathWithOthers(ids, { [OTHER_WRITE_CORE_ID]: otherText });
+
+export const serializeSpiritualPathWithOthers = (
+  ids: string[],
+  otherTexts: Partial<Record<string, string>>
+) => {
+  const base = ids.filter((id) => !isOtherWriteOptionId(id) && !id.startsWith("custom:"));
+  const out = [...base];
+  const coreText = otherTexts[OTHER_WRITE_CORE_ID]?.trim();
+  const tradText = otherTexts[OTHER_WRITE_TRADITIONS_ID]?.trim();
+  if (ids.includes(OTHER_WRITE_CORE_ID) && coreText) {
+    out.push(`custom:core:${coreText}`);
+  }
+  if (ids.includes(OTHER_WRITE_TRADITIONS_ID) && tradText) {
+    out.push(`custom:traditions:${tradText}`);
+  }
+  return serializeSpiritualPathIds(out);
 };
 
 export const parseSpiritualPathForUi = (raw: string | null | undefined) => {
   const ids = parseSpiritualPathIds(raw);
-  return {
-    ids: listIdsForUi(ids),
-    otherText: extractCustomFromList(ids),
-  };
+  const base = ids.filter((id) => !id.startsWith("custom:"));
+  let coreText = "";
+  let traditionsText = "";
+  for (const id of ids) {
+    if (id.startsWith("custom:core:")) coreText = id.slice(12);
+    else if (id.startsWith("custom:traditions:")) traditionsText = id.slice(18);
+    else if (id.startsWith("custom:") && !coreText) coreText = id.slice(7);
+  }
+  const uiIds = [...base];
+  if (coreText) uiIds.push(OTHER_WRITE_CORE_ID);
+  if (traditionsText) uiIds.push(OTHER_WRITE_TRADITIONS_ID);
+  return { ids: uiIds, coreText, traditionsText };
 };

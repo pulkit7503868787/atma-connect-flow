@@ -2,18 +2,27 @@ import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import type { SpiritualPathGroup } from "@/lib/onboardingOptions";
-import { OTHER_WRITE_ID } from "@/lib/onboardingOptions";
+import { isOtherWriteOptionId, OTHER_WRITE_ID } from "@/lib/onboardingOptions";
 
 type ChipOption = { id: string; label: string };
+
+export type OtherFieldConfig = {
+  text: string;
+  onTextChange: (value: string) => void;
+  placeholder?: string;
+};
 
 type ChipMultiSelectProps = {
   groups?: SpiritualPathGroup[];
   options?: ChipOption[];
   value: string[];
   onChange: (ids: string[]) => void;
+  /** Legacy single “Other” field (flat options). */
   otherText?: string;
   onOtherTextChange?: (text: string) => void;
   otherPlaceholder?: string;
+  /** Per-option “Other” fields (grouped paths: core vs traditions). */
+  otherFields?: Record<string, OtherFieldConfig>;
   className?: string;
 };
 
@@ -25,6 +34,7 @@ export const ChipMultiSelect = ({
   otherText = "",
   onOtherTextChange,
   otherPlaceholder = "Share in your own words",
+  otherFields,
   className,
 }: ChipMultiSelectProps) => {
   const flatOptions = useMemo(() => {
@@ -41,6 +51,36 @@ export const ChipMultiSelect = ({
 
   const toggle = (id: string) => {
     onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
+  };
+
+  const renderOtherInput = (optionId: string) => {
+    const field = otherFields?.[optionId];
+    if (field && value.includes(optionId)) {
+      return (
+        <Input
+          value={field.text}
+          onChange={(e) => field.onTextChange(e.target.value)}
+          placeholder={field.placeholder ?? otherPlaceholder}
+          className="h-10 bg-card border-border/60 text-sm"
+        />
+      );
+    }
+    if (
+      optionId === OTHER_WRITE_ID &&
+      onOtherTextChange &&
+      value.includes(OTHER_WRITE_ID) &&
+      !otherFields
+    ) {
+      return (
+        <Input
+          value={otherText}
+          onChange={(e) => onOtherTextChange(e.target.value)}
+          placeholder={otherPlaceholder}
+          className="h-10 bg-card border-border/60 text-sm"
+        />
+      );
+    }
+    return null;
   };
 
   const renderChips = (opts: ChipOption[]) => (
@@ -67,24 +107,22 @@ export const ChipMultiSelect = ({
   return (
     <div className={cn("space-y-3", className)}>
       {grouped
-        ? grouped.map(({ group, options: opts }) =>
-            opts.length ? (
+        ? grouped.map(({ group, options: opts }) => {
+            const otherOpt = opts.find((o) => isOtherWriteOptionId(o.id));
+            return opts.length ? (
               <div key={group} className="space-y-2">
                 <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{group}</p>
                 {renderChips(opts)}
+                {otherOpt ? renderOtherInput(otherOpt.id) : null}
               </div>
-            ) : null
-          )
-        : renderChips(flatOptions.map(({ id, label }) => ({ id, label })))}
-
-      {value.includes(OTHER_WRITE_ID) && onOtherTextChange ? (
-        <Input
-          value={otherText}
-          onChange={(e) => onOtherTextChange(e.target.value)}
-          placeholder={otherPlaceholder}
-          className="h-10 bg-card border-border/60 text-sm"
-        />
-      ) : null}
+            ) : null;
+          })
+        : (
+          <>
+            {renderChips(flatOptions.map(({ id, label }) => ({ id, label })))}
+            {value.includes(OTHER_WRITE_ID) ? renderOtherInput(OTHER_WRITE_ID) : null}
+          </>
+        )}
     </div>
   );
 };
